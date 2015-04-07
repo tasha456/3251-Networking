@@ -5,7 +5,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
 public class Packet {
-	public final int HEADER_LENGTH = 31;
+	public final int HEADER_LENGTH = 33;
 	public final int ERROR_DETECTION_LENGTH = 20;
 	long sequenceNumber;
 	int windowSize;
@@ -17,6 +17,7 @@ public class Packet {
 	boolean isCorrupted;
 	InetAddress address;
 	int portNumber;
+	byte[] rawBytes;
 	
 	/**
 	 * This is used to create a new packet where you manually input the flags
@@ -46,6 +47,8 @@ public class Packet {
 	 * @param portNumber
 	 */
 	public Packet(byte[] rawBytes,InetAddress address,int portNumber){
+		System.out.println(rawBytes.length);
+		this.rawBytes = rawBytes;
 		this.address = address;
 		this.portNumber = portNumber;
 		this.sequenceNumber = readLong(rawBytes,0);
@@ -56,6 +59,7 @@ public class Packet {
 		this.windowSize = readInt(rawBytes,9);
 		this.errorDetection = new byte[ERROR_DETECTION_LENGTH];
 		int dataLength = rawBytes.length - HEADER_LENGTH;
+		System.arraycopy(rawBytes,HEADER_LENGTH-ERROR_DETECTION_LENGTH,errorDetection,0,ERROR_DETECTION_LENGTH);
 		if(dataLength > 0){
 			this.data = new byte[dataLength];
 			System.arraycopy(rawBytes, HEADER_LENGTH, this.data, 0, dataLength);
@@ -66,9 +70,20 @@ public class Packet {
 		byte[] adjustedBytes = new byte[rawBytes.length];
 		System.arraycopy(rawBytes, 0, adjustedBytes, 0, rawBytes.length);
 		prepareForHash(adjustedBytes);
+		
 		try {
 			MessageDigest md = MessageDigest.getInstance("SHA-1");
 			byte[] hash = md.digest(adjustedBytes);
+			String ans = "";
+			for(byte item: hash){
+				ans += String.format("%8s", Integer.toBinaryString(item & 0xFF)).replace(' ', '0') + "|";
+			}
+			System.out.println(ans);
+			ans = "";
+			for(byte item: errorDetection){
+				ans += String.format("%8s", Integer.toBinaryString(item & 0xFF)).replace(' ', '0') + "|";
+			}
+			System.out.println(ans);
 			this.isCorrupted = false;
 			for(int i = 0;i<hash.length;i++){
 				if(hash[i] != errorDetection[i]){
@@ -96,6 +111,11 @@ public class Packet {
 		answer[8] = Byte.parseByte(flagString,2);
 		byte[] winSize = java.nio.ByteBuffer.allocate(4).putInt(this.windowSize).array();
 		System.arraycopy(winSize, 0, answer, 9, 4);
+		String ans = "";
+		for(byte item: winSize){
+			ans += String.format("%8s", Integer.toBinaryString(item & 0xFF)).replace(' ', '0') + "|";
+		}
+		System.out.println(ans);
 		
 		if(data != null){
 			System.arraycopy(data,0,answer,HEADER_LENGTH,data.length);
@@ -103,6 +123,11 @@ public class Packet {
 		byte[] adjustedBytes = new byte[answer.length];
 		System.arraycopy(answer, 0, adjustedBytes, 0, answer.length);
 		prepareForHash(adjustedBytes);
+		ans = "";
+		for(byte item: adjustedBytes){
+			ans += String.format("%8s", Integer.toBinaryString(item & 0xFF)).replace(' ', '0') + "|";
+		}
+		System.out.println(ans);
 		try {
 			MessageDigest md = MessageDigest.getInstance("SHA-1");
 			this.errorDetection = md.digest(adjustedBytes);
@@ -117,7 +142,9 @@ public class Packet {
 		}
 		System.arraycopy(this.errorDetection, 0, answer, 
 				HEADER_LENGTH-ERROR_DETECTION_LENGTH,ERROR_DETECTION_LENGTH);
+		this.rawBytes = answer;
 		System.out.println(this.toString());
+		System.out.println(answer.length);
 		return answer;
 	}
 	public long getSequenceNumber(){
@@ -148,6 +175,7 @@ public class Packet {
 		return this.portNumber;
 	}
 	public String toString(){
+		
 		String ans = "";
 		ans += this.sequenceNumber + ", ";
 		ans += this.ackFlag ? "TRUE, " : "FALSE, ";
@@ -156,6 +184,11 @@ public class Packet {
 		ans += this.windowSize + " ||| ";
 		if(data != null)
 			ans += new String(data);
+		byte[] raw = rawBytes;
+		ans += "\n";
+		for(byte item: raw){
+			ans += String.format("%8s", Integer.toBinaryString(item & 0xFF)).replace(' ', '0') + "|";
+		}
 		return ans;
 	}
 	/**
@@ -165,8 +198,8 @@ public class Packet {
 	 * @param adjustedBytes a byte array representing the packet you want prepared
 	 */
 	private void prepareForHash(byte[] adjustedBytes){
-		int errorIndex = 11;
-		int errorLength = 20;
+		int errorIndex = HEADER_LENGTH-ERROR_DETECTION_LENGTH;
+		int errorLength = ERROR_DETECTION_LENGTH;
 		for(int index = errorIndex;index < errorIndex + errorLength;index++){
 			adjustedBytes[index] = 0;
 		}

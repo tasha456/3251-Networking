@@ -20,6 +20,7 @@ public class RxPParent implements Runnable{
 	private RxPParent(int portNumber) throws SocketException{
 		this.portNumber = portNumber;
 		this.socket = new DatagramSocket(portNumber);
+		rxpSocket = new HashMap<String,RxPSocket>();
 	}
 	public void run(){
 		active = true;
@@ -29,12 +30,18 @@ public class RxPParent implements Runnable{
 				byte[] data = new byte[RxPSocket.MAXIMUM_PACKET_SIZE];
 				DatagramPacket rawPacket = new DatagramPacket(data,RxPSocket.MAXIMUM_PACKET_SIZE);
 				socket.receive(rawPacket);
+				int len = rawPacket.getLength();
+				byte[] actualPacket = new byte[len];
+				System.arraycopy(rawPacket.getData(),0, actualPacket, 0, len);
 				System.out.println("Packet received");
 				InetAddress sourceAddress = rawPacket.getAddress();
 				int portNumber = rawPacket.getPort();
-				Packet packet = new Packet(rawPacket.getData(),sourceAddress,portNumber);
+				Packet packet = new Packet(actualPacket,sourceAddress,portNumber);
 				if(packet.getIsCorrupted() == false){
 					receivePacket(packet);
+				} else{
+					System.out.println("Corrupted packet ");
+					System.out.println(packet.toString());
 				}
 			}  catch (IOException e) {
 				// TODO Auto-generated catch block
