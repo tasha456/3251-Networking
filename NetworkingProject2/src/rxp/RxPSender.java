@@ -49,29 +49,29 @@ public class RxPSender implements Runnable {
 
 				if(dataSize>packetLength){
 					byte[] newPacket=new byte[currSize-300];
-					System.arraycopy(currPacket,currPacket[0], dataToSend, dataToSend[0],300);
-					System.arraycopy(currPacket,currPacket[299],newPacket, newPacket[0],currSize-300);
+					System.arraycopy(currPacket,0, dataToSend, 0,300);
+					System.arraycopy(currPacket,299,newPacket, 0,currSize-300);
 					list.addFirst(newPacket);
 					dataSize=300;
 				}
 
 
 				while(dataSize<packetLength){
-					System.arraycopy(currPacket,currPacket[0],dataToSend,dataToSend[0],dataSize);
+					System.arraycopy(currPacket,0,dataToSend,0,dataSize);
 					currPacket=list.pop();
 					currSize=currPacket.length;
 					int totalSize =currSize+dataSize;
 					if(totalSize==packetLength){
-						System.arraycopy(currPacket,currPacket[0],dataToSend,dataToSend[dataSize],currSize);
+						System.arraycopy(currPacket,0,dataToSend,dataSize,currSize);
 						dataSize=300;
 					}else if(totalSize<packetLength){
-						System.arraycopy(currPacket,currPacket[0],dataToSend,dataToSend[dataSize],currSize);
+						System.arraycopy(currPacket,0,dataToSend,dataSize,currSize);
 						dataSize=totalSize;
 					}else{
 						byte[] newPack=new byte[currSize-300];
 						int left=300-dataSize;
-						System.arraycopy(currPacket,currPacket[0],dataToSend,dataToSend[dataSize],left);
-						System.arraycopy(currPacket,currPacket[299],newPack,newPack[0],currSize-300);		
+						System.arraycopy(currPacket,0,dataToSend,dataSize,left);
+						System.arraycopy(currPacket,299,newPack,0,currSize-300);		
 						list.addFirst(newPack);	
 						dataSize=300;	
 					}
