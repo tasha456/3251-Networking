@@ -100,6 +100,7 @@ public class RxPSocket {
 				Packet packet = new Packet(this.sequenceNumber,false,false,true,
 						windowSize,connectionAddress,connectionPort,null);
 				parent.sendPacket(packet);
+				state = State.SYN_SENT;
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
