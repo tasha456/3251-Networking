@@ -198,7 +198,7 @@ public class RxPSocket {
 		this.windowSize = windowSize;
 		int repeatCount = 0;
 		Random rand = new Random();
-		byte[] challenge = null;
+		byte[] challenge = new byte[20];
 		byte[] challengeAns=null;
 		byte[] challengeAnswer=null;
 		rand.nextBytes(challenge);

@@ -9,6 +9,7 @@ import rxp.*;
 public class Test {
 
 	public static void main(String args[]){
+		System.out.println("SENDING STUFF");
 		RxPSocket socket = new RxPSocket();
 		try {
 			InetAddress address = InetAddress.getByName("localhost");

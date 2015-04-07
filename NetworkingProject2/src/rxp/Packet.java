@@ -218,7 +218,7 @@ public class Packet {
 	private boolean[] readBoolean(byte input){
 		boolean[] ans = new boolean[8];
 		for(int position = 0;position < 8;position++){
-			ans[position] = ((input >> position) & 1) == 1;
+			ans[7-position] = ((input >> position) & 1) == 1;
 		}
 		return ans;
 	}
