@@ -31,53 +31,54 @@ public class RxPSender implements Runnable {
 	public void run(){
 		while(true){
 			if(list.size()==0){
-				try{
+				try {
 					Thread.sleep(500);
-				}catch(InterupptedException){
-
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
 				}
-
+				
 			}
 
 			int dataSize=0;
 			byte[] dataToSend=new byte[packetLength];
 			byte[] currPacket=list.pop();
-			int currSize=currPacket.size();
+			int currSize=currPacket.length;
 			dataSize=currSize;
 			if(dataSize!=packetLength){
 
 				if(dataSize>packetLength){
-					byte[] newPacket=byte[currSize-300];
-					System.arraycopy(currPacket,currPacket[0], dataToSend, dataToSend[0],300);
-					System.arraycopy(currPacket,currPacket[299],newPacket, newPacket[0],currSize-300);
+					byte[] newPacket=new byte[currSize-300];
+					System.arraycopy(currPacket,0, dataToSend, 0,300);
+					System.arraycopy(currPacket,299,newPacket, 0,currSize-300);
 					list.addFirst(newPacket);
 					dataSize=300;
 				}
 
 
 				while(dataSize<packetLength){
-					System.arraycopy(currPacket,currPacket[0],dataToSend,dataToSend[0],dataSize);
+					System.arraycopy(currPacket,0,dataToSend,0,dataSize);
 					currPacket=list.pop();
-					currSize=currPacket.size();
-					if(currSize+dataSize=packetLength){
-						System.arraycopy(currPacket,currPacket[0],dataToSend,dataToSend[dataSize],currSize);
+					currSize=currPacket.length;
+					int totalSize =currSize+dataSize;
+					if(totalSize==packetLength){
+						System.arraycopy(currPacket,0,dataToSend,dataSize,currSize);
 						dataSize=300;
-					}else if(currSize+dataSize<packetLength){
-						System.arraycopy(currPacket,currPacket[0],dataToSend,dataToSend[dataSize],currSize);
-						dataSize=dataSize+currSize;
-					}else(currSize+dataSize>packet){
-						byte newPack=byte[currSize-300];
-						int left=300-datasize;
-						System.arraycopy(currPacket,currPacket[0],dataToSend,dataTosend[dataSize],left);
-						System.arraycopy(currPacket,currPacket[299],newPacket[0],currSize-300);		
-						list.addFirst(newPacket);	
+					}else if(totalSize<packetLength){
+						System.arraycopy(currPacket,0,dataToSend,dataSize,currSize);
+						dataSize=totalSize;
+					}else{
+						byte[] newPack=new byte[currSize-300];
+						int left=300-dataSize;
+						System.arraycopy(currPacket,0,dataToSend,dataSize,left);
+						System.arraycopy(currPacket,299,newPack,0,currSize-300);		
+						list.addFirst(newPack);	
 						dataSize=300;	
-
 					}
 
 				}
 			}
-			Packet pack=new Packet(sequenceNumber, false, false, false, windowSize, dataToSend);
+			Packet pack=new Packet(sequenceNumber, false, false, false, windowSize,dest, portNumber,dataToSend);
 
 		}
 
