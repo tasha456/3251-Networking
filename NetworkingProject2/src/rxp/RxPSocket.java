@@ -198,10 +198,11 @@ public class RxPSocket {
 		this.windowSize = windowSize;
 		int repeatCount = 0;
 		Random rand = new Random();
-		byte[] challenge = null;
+		byte[] challenge = new byte[20];
 		byte[] challengeAns=null;
 		byte[] challengeAnswer=null;
 		rand.nextBytes(challenge);
+		
 		try{
 			this.parent = RxPParent.addSocket(this, portNumber);
 			
@@ -209,69 +210,68 @@ public class RxPSocket {
 			e.printStackTrace();
 		}
 		while(this.state != State.ESTABLISHED){
-			
-			
-		}	
-		switch(this.state){
-		case LISTEN:
-				Packet packet=this.packetList.pop();
-				if(packet.getSynFlag()){
-					this.ackNumber=packet.getSequenceNumber()+1;
-					Packet sendPacket=new Packet(ackNumber,true,false,false,windowSize,connectionAddress,portNumber,challenge);
-					parent.sendPacket(sendPacket);
-					state=State.SYN_RCVD;
+				
+			switch(this.state){
+			case LISTEN:
+					Packet packet=this.packetList.pop();
+					if(packet.getSynFlag()){
+						this.ackNumber=packet.getSequenceNumber()+1;
+						Packet sendPacket=new Packet(ackNumber,true,false,false,windowSize,connectionAddress,portNumber,challenge);
+						parent.sendPacket(sendPacket);
+						state=State.SYN_RCVD;
+					}else{
+						break;
+					}
+				
+			case SYN_RCVD:
+				try{
+					if(repeatCount %40 == 0){
+						Packet sendPacket = new Packet(this.ackNumber, 
+								true, false, false, 0, connectionAddress,
+								connectionPort, challenge);
+						parent.sendPacket(sendPacket);
+					}
+				Packet packet1 = this.packetList.pop();
+				MessageDigest md = MessageDigest.getInstance("MD5");
+				challengeAns = md.digest(challenge);
+				challengeAnswer=packet1.getData();
+				state=State.CHAL_CHCK;
+				}catch(IOException e){
+					e.printStackTrace();
+			}
+			repeatCount +=1;
+			case CHAL_CHCK:
+				try {				
+					if(challengeAns==challengeAnswer){
+						Packet sendPacket=new Packet(this.sequenceNumber,false,false,true, windowSize, connectionAddress, portNumber, null);
+						parent.sendPacket(sendPacket);  
+					}else{
+						Packet sendPacket=new Packet(this.sequenceNumber,false,true,false,windowSize,connectionAddress,portNumber,null);
+						parent.sendPacket(sendPacket);
+						state=State.LISTEN;
+					}
+				}catch(IOException e) {
+					e.printStackTrace();
+				}
+			case SYN_SENT2:
+				try{
+					if(repeatCount %40 == 0){
+						Packet sendPacket = new Packet(this.sequenceNumber, 
+								false, false, true, 0, connectionAddress,
+								connectionPort, null);
+						parent.sendPacket(sendPacket);
+					}
+				Packet pack=this.packetList.pop();
+				if(pack.getAckFlag()){
+					connectionEstablished=true;
+					state=State.ESTABLISHED;
 				}else{
 					break;
 				}
-			
-		case SYN_RCVD:
-			try{
-				if(repeatCount %40 == 0){
-					Packet sendPacket = new Packet(this.ackNumber, 
-							true, false, false, 0, connectionAddress,
-							connectionPort, challenge);
-					parent.sendPacket(sendPacket);
+				}catch(IOException e) {
+					e.printStackTrace();
 				}
-			Packet packet1 = this.packetList.pop();
-			MessageDigest md = MessageDigest.getInstance("MD5");
-			challengeAns = md.digest(challenge);
-			challengeAnswer=packet1.getData();
-			state=State.CHAL_CHCK;
-			}catch(IOException e){
-				e.printStackTrace();
-		}
-		repeatCount +=1;
-		case CHAL_CHCK:
-			try {				
-				if(challengeAns==challengeAnswer){
-					Packet sendPacket=new Packet(this.sequenceNumber,false,false,true, windowSize, connectionAddress, portNumber, null);
-					parent.sendPacket(sendPacket);  
-				}else{
-					Packet sendPacket=new Packet(this.sequenceNumber,false,true,false,windowSize,connectionAddress,portNumber,null);
-					parent.sendPacket(sendPacket);
-					state=State.LISTEN;
-				}
-			}catch(IOException e) {
-				e.printStackTrace();
 			}
-		case SYN_SENT2:
-			try{
-				if(repeatCount %40 == 0){
-					Packet sendPacket = new Packet(this.sequenceNumber, 
-							false, false, true, 0, connectionAddress,
-							connectionPort, null);
-					parent.sendPacket(sendPacket);
-				}
-			Packet pack=this.packetList.pop();
-			if(pack.getAckFlag()){
-				connectionEstablished=true;
-				state=State.ESTABLISHED;
-			}else{
-				break;
-			}
-			}catch(IOException e) {
-				e.printStackTrace();
-			}	
 		}
 			
 	}

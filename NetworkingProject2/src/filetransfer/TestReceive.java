@@ -1,12 +1,14 @@
 package filetransfer;
 
+import java.io.IOException;
 import java.net.SocketException;
+import java.security.NoSuchAlgorithmException;
 
 import rxp.*;
 
 public class TestReceive {
 
-	public static void main(String[] args){
+	public static void main(String[] args) throws NoSuchAlgorithmException, IOException{
 		try{
 			RxPSocket socket = new RxPSocket();
 			socket.listen(9998, 10000);
