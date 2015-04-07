@@ -7,14 +7,14 @@ import java.util.*;
  */
 public class RxPSender implements Runnable {
 
-	InetAdress dest;
+	InetAddress dest;
 	int portNumber;
 	int windowSize;
 	LinkedList<byte[]> list;
 	int packetLength=300;
 	long sequenceNumber;
 
-	public RxPSender(InetAdress dest, int portNumber){
+	public RxPSender(InetAddress dest, int portNumber){
 		//this.data=new byte[numOfBytes];
 		this.dest=dest;
 		this.portNumber=portNumber;

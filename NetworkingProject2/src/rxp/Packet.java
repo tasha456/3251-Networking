@@ -6,7 +6,7 @@ import java.security.NoSuchAlgorithmException;
 
 public class Packet {
 	public final int HEADER_LENGTH = 31;
-	public final int ERROR_DETECTION_LENGTH = 31-12;
+	public final int ERROR_DETECTION_LENGTH = 20;
 	long sequenceNumber;
 	int windowSize;
 	byte[] errorDetection;
@@ -29,7 +29,9 @@ public class Packet {
 	 * @param data
 	 */
 	public Packet(long sequenceNumber,boolean ackFlag,boolean finFlag,boolean synFlag,
-			int windowSize,byte[] data){
+			int windowSize,InetAddress address,int portNumber,byte[] data){
+		this.address = address;
+		this.portNumber = portNumber;
 		this.sequenceNumber = sequenceNumber;
 		this.ackFlag = ackFlag;
 		this.finFlag = finFlag;
@@ -78,7 +80,13 @@ public class Packet {
 		}
 	}
 	public byte[] getRawBytes(){
-		byte[] answer = new byte[data.length+ HEADER_LENGTH];
+		
+		byte[] answer = null;
+		if(data != null){
+			answer = new byte[data.length+ HEADER_LENGTH];
+		} else{
+			answer = new byte[HEADER_LENGTH];
+		}
 		byte[] seqNum = java.nio.ByteBuffer.allocate(8).putLong(this.sequenceNumber).array();
 		System.arraycopy(seqNum, 0, answer, 0, 8);
 		String flagString = "00000";
@@ -89,20 +97,27 @@ public class Packet {
 		byte[] winSize = java.nio.ByteBuffer.allocate(4).putInt(this.windowSize).array();
 		System.arraycopy(winSize, 0, answer, 9, 4);
 		
-		byte[] adjustedBytes = new byte[this.data.length];
-		System.arraycopy(this.data, 0, adjustedBytes, 0, this.data.length);
+		if(data != null){
+			System.arraycopy(data,0,answer,HEADER_LENGTH,data.length);
+		}
+		byte[] adjustedBytes = new byte[answer.length];
+		System.arraycopy(answer, 0, adjustedBytes, 0, answer.length);
 		prepareForHash(adjustedBytes);
 		try {
 			MessageDigest md = MessageDigest.getInstance("SHA-1");
 			this.errorDetection = md.digest(adjustedBytes);
+			System.out.println(errorDetection.length);
 		} catch (NoSuchAlgorithmException e) {
+			e.printStackTrace();
 			return null; //failed to hash...for some unknown reason
 		}
 		if(errorDetection == null || errorDetection.length != ERROR_DETECTION_LENGTH){
+			System.out.println("something went wrong in error detection");
 			return null;
 		}
 		System.arraycopy(this.errorDetection, 0, answer, 
 				HEADER_LENGTH-ERROR_DETECTION_LENGTH,ERROR_DETECTION_LENGTH);
+		System.out.println(this.toString());
 		return answer;
 	}
 	public long getSequenceNumber(){
@@ -132,7 +147,17 @@ public class Packet {
 	public int getPort(){
 		return this.portNumber;
 	}
-	
+	public String toString(){
+		String ans = "";
+		ans += this.sequenceNumber + ", ";
+		ans += this.ackFlag ? "TRUE, " : "FALSE, ";
+		ans += this.finFlag ? "TRUE, " : "FALSE, ";
+		ans += this.synFlag ? "TRUE, " : "FALSE, ";
+		ans += this.windowSize + " ||| ";
+		if(data != null)
+			ans += new String(data);
+		return ans;
+	}
 	/**
 	 * this method clears the errorDetection bytes out of the supplied array
 	 * so that the rest of the array can be hashed, in the same way it is 

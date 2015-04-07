@@ -7,6 +7,8 @@ import java.net.InetAddress;
 import java.net.SocketException;
 import java.util.HashMap;
 
+import rxp.*;
+
 public class RxPParent implements Runnable{
 
 	private HashMap<String,RxPSocket> rxpSocket;
@@ -23,9 +25,11 @@ public class RxPParent implements Runnable{
 		active = true;
 		while(active){
 			try {
+				System.out.println("Parent is listening");
 				byte[] data = new byte[RxPSocket.MAXIMUM_PACKET_SIZE];
 				DatagramPacket rawPacket = new DatagramPacket(data,RxPSocket.MAXIMUM_PACKET_SIZE);
 				socket.receive(rawPacket);
+				System.out.println("Packet received");
 				InetAddress sourceAddress = rawPacket.getAddress();
 				int portNumber = rawPacket.getPort();
 				Packet packet = new Packet(rawPacket.getData(),sourceAddress,portNumber);
@@ -54,7 +58,8 @@ public class RxPParent implements Runnable{
 	}
 	public void sendPacket(Packet packet) throws IOException{
 		byte[] data = packet.getRawBytes();
-		DatagramPacket datagram = new DatagramPacket(data,RxPSocket.MAXIMUM_PACKET_SIZE);
+		DatagramPacket datagram = new DatagramPacket(data,data.length,
+				packet.getAddress(),packet.getPort());
 		this.socket.send(datagram);
 		try {
 			Thread.sleep(10);

@@ -5,6 +5,10 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.LinkedList;
+import java.util.Random;
 
 public class RxPSocket {
 	
@@ -12,27 +16,33 @@ public class RxPSocket {
 	private enum State{CLOSED,LISTEN,SYN_RCVD,CHAL_CHCK,SYN_SENT2,ESTABLISHED,
 						CLOSED_WAIT,LAST_ACK,SYN_SENT,CHALLENGE,SYN_WAIT,
 						FIN_WAIT1,FIN_WAIT2,TIMED_WAIT,CLOSING};
-	private int destinationPort;
+	private int connectionPort;
+	private long sequenceNumber;
+	private long ackNumber;
 	private State state;
-	private InetAddress address;
+	private InetAddress connectionAddress;
 	private RxPParent parent;
 	boolean connectionEstablished;
+	private LinkedList<Packet> packetList;
 	
 	
 	public RxPSocket(){
 		this.connectionEstablished = false;
-		state = State.CLOSED;
+		this.state = State.CLOSED;
+		this.packetList = new LinkedList<Packet>();
 	}
 	public void receivePacket(Packet packet){
+		System.out.println("Received packet:");
+		System.out.println(packet.toString());
+		if(packet.getIsCorrupted()){
+			return; //treat corrupted packets as lost packets
+		}
 		switch(state){
 		case CLOSED:
 			//do nothing. you shouldn't be getting packets in the closed state anyways
 			break;
 		case LISTEN:
-			if(packet.getSynFlag() && !packet.getAckFlag() && !packet.getFinFlag()){
-				System.out.println("Received syn request");
-				
-			}
+			packetList.add(packet);
 			break;
 		case SYN_RCVD:
 			break;
@@ -47,10 +57,13 @@ public class RxPSocket {
 		case LAST_ACK:
 			break;
 		case SYN_SENT:
+			packetList.add(packet);
 			break;
 		case CHALLENGE:
+			//done in syn_sent.  they shoulda been the same state.  oops :)
 			break;
 		case SYN_WAIT:
+			packetList.add(packet);
 			break;
 		case FIN_WAIT1:
 			break;
@@ -66,16 +79,131 @@ public class RxPSocket {
 		}
 	}
 	public InetAddress getDestinationAddress(){
-		return this.address;
+		return this.connectionAddress;
 	}
 	public int getDestinationPort(){
-		return this.destinationPort;
+		return this.connectionPort;
+	}
+	public void connect(int portNumber,InetAddress connectionAddress,int destinationPort,int windowSize){
+		this.connectionAddress = connectionAddress;
+		this.connectionPort = destinationPort;
+		int repeatCount = 0;
+		byte[] challengeAnswer = null;
+		if(state != State.CLOSED){
+			return; //can't connect if you're not in closed. throw some exception
+		} else{
+			try {
+				this.parent = RxPParent.addSocket(this, portNumber);
+				Packet packet = new Packet(this.sequenceNumber,false,false,true,
+						windowSize,connectionAddress,connectionPort,null);
+				parent.sendPacket(packet);
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+		while(this.state != State.ESTABLISHED){
+			if(repeatCount %40 == 0){
+				switch(this.state){
+					case SYN_WAIT:
+						try{
+							if(repeatCount %40 == 0){
+								Packet sendPacket = new Packet(this.sequenceNumber, 
+										false, false, false, 0, connectionAddress,
+										connectionPort,challengeAnswer);
+								parent.sendPacket(sendPacket);
+							}
+						} catch(IOException e){
+							e.printStackTrace();
+						}
+						break;
+					case SYN_SENT:
+						try {
+							Packet packet = new Packet(this.sequenceNumber,
+									false,false,true,windowSize,connectionAddress,
+									connectionPort,null);
+							parent.sendPacket(packet);
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
+						break;
+					default:
+							//do absolutely nothing.
+						break;
+				}
+			}
+			if(this.packetList.size() == 0){
+				try {
+					Thread.sleep(100);
+					repeatCount +=1;
+					continue;
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
+			Packet packet = this.packetList.pop();
+			switch(this.state){
+			case SYN_SENT:
+				System.out.println("SYN_SENT");
+				if(packet.getAddress().equals(this.connectionAddress)){
+					byte[] challenge = packet.getData();
+					if(packet.getAckFlag() == true && challenge != null &&
+							challenge.length > 0){
+						//send challenge response
+						try {
+							MessageDigest md = MessageDigest.getInstance("MD5");
+							Random rand = new Random();
+							challengeAnswer = md.digest(challenge);
+							Packet sendPacket = new Packet(this.sequenceNumber, 
+									false, false, false, 0, connectionAddress,
+									connectionPort, challengeAnswer);
+							parent.sendPacket(sendPacket);
+						} catch (NoSuchAlgorithmException e) {
+							e.printStackTrace();
+						} catch (IOException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+					}
+				}
+				break;
+			case CHALLENGE:
+				//done in syn_sent.  they shoulda been the same state.  oops :)
+				break;
+			case SYN_WAIT:
+				try{
+					if(repeatCount %40 == 0){
+						Packet sendPacket = new Packet(this.sequenceNumber, 
+								false, false, false, 0, connectionAddress,
+								connectionPort, challengeAnswer);
+						parent.sendPacket(sendPacket);
+					}
+					if(packet.getAddress().equals(this.connectionAddress)){
+						if(packet.getSynFlag()){
+							this.ackNumber = packet.getSequenceNumber() + 1;
+							Packet sendPacket = new Packet(this.ackNumber,
+									true, false, false, 0, connectionAddress,
+									connectionPort,null);
+							parent.sendPacket(sendPacket);
+							state = State.ESTABLISHED;
+							return;
+						} else if(packet.getFinFlag()){
+							state = State.CLOSED;
+							return; //TODO this is a failure to authenticate. throw exception or something
+						}
+					}
+				} catch(IOException e){
+					e.printStackTrace();
+				}
+				break;
+			}
+			repeatCount +=1;
+		}
 	}
 	public void listen(int portNumber,int windowSize) throws SocketException{
 		if(connectionEstablished == true){
 			//Throw an exception
 		}
-		this.parent = RxPParent.addSocket(this,portNumber);
+		this.parent = RxPParent.addSocket(this, portNumber);
 	}
 }
 

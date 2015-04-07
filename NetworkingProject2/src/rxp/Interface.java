@@ -6,6 +6,5 @@ public class Interface {
 
 	LinkedList<byte[]> temp;
 	public Interface(){
-		temp.pop
 	}
 }

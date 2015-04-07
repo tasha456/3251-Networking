@@ -1,9 +1,20 @@
+package filetransfer;
 
+import java.net.InetAddress;
+import java.net.SocketException;
+import java.net.UnknownHostException;
+
+import rxp.*;
 
 public class Test {
 
 	public static void main(String args[]){
 		RxPSocket socket = new RxPSocket();
-		socket.listen(9999);
+		try {
+			InetAddress address = InetAddress.getByName("108.201.124.96");
+			socket.connect(9999,address,9998, 10000);
+		} catch(UnknownHostException e){
+			e.printStackTrace();
+		}
 	}
 }

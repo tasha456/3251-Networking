@@ -1,4 +1,7 @@
 package rxp;
+
+import java.net.InetAddress;
+
 /**
  * this class runs on a seperate thread, to handle incoming RxP Packets
  *
@@ -8,13 +11,17 @@ public class RxPReceiver {
 	byte[] data;
 	int readIndex; //last index it read
 	int receiveIndex; //next index to write to
+	InetAddress address;
+	int port;
 	/**
 	 * creates a receiver socket whose job is to manage sending acks,
 	 * and window sizes to the opposite end of the connection
 	 * @param bufferSize 
 	 */
-	public RxPReceiver(int bufferSize){
+	public RxPReceiver(int bufferSize,InetAddress address,int port){
 		this.data = new byte[bufferSize + 1];
+		this.address = address;
+		this.port = port;
 		readIndex = -1;
 		receiveIndex = 0;
 	}
@@ -22,7 +29,8 @@ public class RxPReceiver {
 		if(getRemainingSpace() >= packet.getData().length){
 			copyData(packet.getData());
 			long ackNumber = packet.getSequenceNumber() + packet.getData().length;
-			Packet sendPacket = new Packet(ackNumber, true, false, false, 0, null);
+			Packet sendPacket = new Packet(ackNumber, true, false, false, 0, 
+						address,port,null);
 		}
 	}
 	public void readData(byte[] receiver){
