@@ -11,7 +11,7 @@ public class Test {
 	public static void main(String args[]){
 		RxPSocket socket = new RxPSocket();
 		try {
-			InetAddress address = InetAddress.getByName("108.201.124.96");
+			InetAddress address = InetAddress.getByName("localhost");
 			socket.connect(9999,address,9998, 10000);
 		} catch(UnknownHostException e){
 			e.printStackTrace();

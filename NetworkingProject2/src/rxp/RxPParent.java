@@ -60,6 +60,7 @@ public class RxPParent implements Runnable{
 		byte[] data = packet.getRawBytes();
 		DatagramPacket datagram = new DatagramPacket(data,data.length,
 				packet.getAddress(),packet.getPort());
+		System.out.println("SENDING TO " + packet.getPort());
 		this.socket.send(datagram);
 		try {
 			Thread.sleep(10);
