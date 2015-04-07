@@ -26,7 +26,6 @@ public class RxPParent implements Runnable{
 		active = true;
 		while(active){
 			try {
-				System.out.println("Parent is listening");
 				byte[] data = new byte[RxPSocket.MAXIMUM_PACKET_SIZE];
 				DatagramPacket rawPacket = new DatagramPacket(data,RxPSocket.MAXIMUM_PACKET_SIZE);
 				socket.receive(rawPacket);
@@ -41,7 +40,6 @@ public class RxPParent implements Runnable{
 					receivePacket(packet);
 				} else{
 					System.out.println("Corrupted packet ");
-					System.out.println(packet.toString());
 				}
 			}  catch (IOException e) {
 				// TODO Auto-generated catch block
