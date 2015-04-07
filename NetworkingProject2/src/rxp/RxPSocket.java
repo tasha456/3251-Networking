@@ -24,6 +24,8 @@ public class RxPSocket {
 	private RxPParent parent;
 	boolean connectionEstablished;
 	private LinkedList<Packet> packetList;
+	private int windowSize;
+	private int portNumber;
 	
 	
 	public RxPSocket(){
@@ -104,18 +106,6 @@ public class RxPSocket {
 		while(this.state != State.ESTABLISHED){
 			if(repeatCount %40 == 0){
 				switch(this.state){
-					case SYN_WAIT:
-						try{
-							if(repeatCount %40 == 0){
-								Packet sendPacket = new Packet(this.sequenceNumber, 
-										false, false, false, 0, connectionAddress,
-										connectionPort,challengeAnswer);
-								parent.sendPacket(sendPacket);
-							}
-						} catch(IOException e){
-							e.printStackTrace();
-						}
-						break;
 					case SYN_SENT:
 						try {
 							Packet packet = new Packet(this.sequenceNumber,
@@ -203,7 +193,40 @@ public class RxPSocket {
 		if(connectionEstablished == true){
 			//Throw an exception
 		}
-		this.parent = RxPParent.addSocket(this, portNumber);
+		this.portNumber = portNumber;
+		this.windowSize = windowSize;
+		int repeatCount = 0;
+		byte[] challenge = null;
+		byte[] challengeAns=null;
+		byte[] challengeAnswer=null;
+		try{
+			this.parent = RxPParent.addSocket(this, portNumber);
+			Packet packet = new Packet(this.sequenceNumber,false,false,true,
+					windowSize,connectionAddress,connectionPort,null);
+			receivePacket(packet);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		while(this.state != State.ESTABLISHED){
+			
+			
+		}	
+		Packet packet = this.packetList.pop();
+		try {
+			MessageDigest md = MessageDigest.getInstance("MD5");
+			Random rand = new Random();
+			challengeAnswer = md.digest(challenge);
+			Packet pack = new Packet(this.sequenceNumber, 
+					false, false, false, 0, connectionAddress,connectionPort, challengeAns);
+			receivePacket(pack);
+			challengeAns=pack.getData();
+			if(challengeAns==challengeAnswer){
+				Packet sendPacket=new Packet(this.sequenceNumber,)
+			}
+
+				
+		
+		
 	}
 }
 
