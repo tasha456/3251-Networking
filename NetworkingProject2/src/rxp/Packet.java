@@ -78,12 +78,6 @@ public class Packet {
 			for(byte item: hash){
 				ans += String.format("%8s", Integer.toBinaryString(item & 0xFF)).replace(' ', '0') + "|";
 			}
-			System.out.println(ans);
-			ans = "";
-			for(byte item: errorDetection){
-				ans += String.format("%8s", Integer.toBinaryString(item & 0xFF)).replace(' ', '0') + "|";
-			}
-			System.out.println(ans);
 			this.isCorrupted = false;
 			for(int i = 0;i<hash.length;i++){
 				if(hash[i] != errorDetection[i]){
@@ -111,23 +105,12 @@ public class Packet {
 		answer[8] = Byte.parseByte(flagString,2);
 		byte[] winSize = java.nio.ByteBuffer.allocate(4).putInt(this.windowSize).array();
 		System.arraycopy(winSize, 0, answer, 9, 4);
-		String ans = "";
-		for(byte item: winSize){
-			ans += String.format("%8s", Integer.toBinaryString(item & 0xFF)).replace(' ', '0') + "|";
-		}
-		System.out.println(ans);
-		
 		if(data != null){
 			System.arraycopy(data,0,answer,HEADER_LENGTH,data.length);
 		}
 		byte[] adjustedBytes = new byte[answer.length];
 		System.arraycopy(answer, 0, adjustedBytes, 0, answer.length);
 		prepareForHash(adjustedBytes);
-		ans = "";
-		for(byte item: adjustedBytes){
-			ans += String.format("%8s", Integer.toBinaryString(item & 0xFF)).replace(' ', '0') + "|";
-		}
-		System.out.println(ans);
 		try {
 			MessageDigest md = MessageDigest.getInstance("SHA-1");
 			this.errorDetection = md.digest(adjustedBytes);
@@ -144,7 +127,6 @@ public class Packet {
 				HEADER_LENGTH-ERROR_DETECTION_LENGTH,ERROR_DETECTION_LENGTH);
 		this.rawBytes = answer;
 		System.out.println(this.toString());
-		System.out.println(answer.length);
 		return answer;
 	}
 	public long getSequenceNumber(){
@@ -236,7 +218,7 @@ public class Packet {
 	private boolean[] readBoolean(byte input){
 		boolean[] ans = new boolean[8];
 		for(int position = 0;position < 8;position++){
-			ans[position] = ((input >> position) & 1) == 1;
+			ans[7-position] = ((input >> position) & 1) == 1;
 		}
 		return ans;
 	}
