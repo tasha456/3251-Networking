@@ -31,12 +31,8 @@ public class RxPSender implements Runnable {
 	public void run(){
 		while(true){
 			if(list.size()==0){
-				try{
-					Thread.sleep(500);
-				}catch(InterupptedException){
-
-				}
-
+				Thread.sleep(500);
+				
 			}
 
 			int dataSize=0;
