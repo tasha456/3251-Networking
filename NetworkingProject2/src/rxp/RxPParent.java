@@ -5,7 +5,9 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.util.HashMap;
+import java.util.LinkedList;
 
 import rxp.*;
 
@@ -17,10 +19,13 @@ public class RxPParent implements Runnable{
 	private int portNumber;
 	private boolean active;
 	private DatagramSocket socket;
+	private LinkedList<Packet>packetList;
 	private RxPParent(int portNumber) throws SocketException{
 		this.portNumber = portNumber;
 		this.socket = new DatagramSocket(portNumber);
+		this.socket.setSoTimeout(200);
 		rxpSocket = new HashMap<String,RxPSocket>();
+		packetList = new LinkedList<Packet>();
 	}
 	public void run(){
 		active = true;
@@ -29,6 +34,7 @@ public class RxPParent implements Runnable{
 				byte[] data = new byte[RxPSocket.MAXIMUM_PACKET_SIZE];
 				DatagramPacket rawPacket = new DatagramPacket(data,RxPSocket.MAXIMUM_PACKET_SIZE);
 				socket.receive(rawPacket);
+				
 				int len = rawPacket.getLength();
 				byte[] actualPacket = new byte[len];
 				System.arraycopy(rawPacket.getData(),0, actualPacket, 0, len);
@@ -41,7 +47,13 @@ public class RxPParent implements Runnable{
 				} else{
 					System.out.println("Corrupted packet ");
 				}
-			}  catch (IOException e) {
+				sendQueuedPackets();
+			}   
+			catch(SocketTimeoutException e){
+				sendQueuedPackets();
+				
+			}
+			catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
@@ -61,18 +73,25 @@ public class RxPParent implements Runnable{
 		}
 		return true;
 	}
-	public void sendPacket(Packet packet) throws IOException{
-		byte[] data = packet.getRawBytes();
-		DatagramPacket datagram = new DatagramPacket(data,data.length,
-				packet.getAddress(),packet.getPort());
-		System.out.println("SENDING TO " + packet.getPort());
-		this.socket.send(datagram);
-		try {
-			Thread.sleep(10);
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+	private void sendQueuedPackets(){
+		int packetLength = packetList.size();
+		int i = 0;
+		while(i< packetLength){
+			Packet packet = packetList.pop();
+			byte[] data = packet.getRawBytes();
+			DatagramPacket datagram = new DatagramPacket(data,data.length,
+					packet.getAddress(),packet.getPort());
+			System.out.println("SENDING TO " + packet.getPort());
+			try {
+				this.socket.send(datagram);
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 		}
+	}
+	public void sendPacket(Packet packet) throws IOException{
+		this.packetList.add(packet);
 	}
 	private void receivePacket(Packet packet){
 		String address = createKey(packet);
