@@ -22,6 +22,8 @@ public class RxPSocket {
 	private State state;
 	private InetAddress connectionAddress;
 	private RxPParent parent;
+	private RxPReceiver receiver;
+	private RxPSender sender;
 	boolean connectionEstablished;
 	private LinkedList<Packet> packetList;
 	private int windowSize;
@@ -54,6 +56,7 @@ public class RxPSocket {
 		case SYN_SENT2:
 			break;
 		case ESTABLISHED:
+			this.receiver.receivePacket(packet);
 			break;
 		case CLOSED_WAIT:
 			break;
@@ -86,6 +89,13 @@ public class RxPSocket {
 	}
 	public int getDestinationPort(){
 		return this.connectionPort;
+	}
+	/**
+	 * This method MUST be called before entering into the established state.
+	 */
+	public void establishedSetup(){
+		this.sender = new RxPSender(connectionAddress, connectionPort);
+		this.receiver = new RxPReceiver(500, connectionAddress, connectionPort, parent);
 	}
 	public void connect(int portNumber,InetAddress connectionAddress,int destinationPort,int windowSize){
 		this.connectionAddress = connectionAddress;
