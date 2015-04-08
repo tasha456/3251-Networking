@@ -159,6 +159,7 @@ public class RxPSocket {
 									false, false, false, 0, connectionAddress,
 									connectionPort, challengeAnswer);
 							parent.sendPacket(sendPacket);
+							state=State.SYN_WAIT;
 						} catch (NoSuchAlgorithmException e) {
 							e.printStackTrace();
 						} catch (IOException e) {
@@ -218,47 +219,72 @@ public class RxPSocket {
 		rand.nextBytes(challenge);
 		
 		try{
-			this.parent = RxPParent.addSocket(this, portNumber);
+			this.parent=RxPParent.addSocket(this, portNumber);			
 			
 		} catch (IOException e) {
 			e.printStackTrace();
 		}	
-
 		while(this.state != State.ESTABLISHED){
+			
 			switch(this.state){
-			case LISTEN:		
-					Packet packet=this.packetList.pop();
-					connectionAddress=packet.getAddress();
-					if(packet.getSynFlag()){
-						this.ackNumber=packet.getSequenceNumber()+1;
-						Packet sendPacket=new Packet(ackNumber,true,false,false,windowSize,packet.getAddress(),packet.getPort(),challenge);
-						parent.sendPacket(sendPacket);
-						state=State.SYN_RCVD;
+			case CLOSED:
+				System.out.println("CLOSED");
 
-					}else{
-						break;
+					state=State.LISTEN;
+			case LISTEN:	
+					//System.out.println("LISTEN");
+
+					if(packetList.size()>0){
+						Packet packet=this.packetList.pop();
+						connectionAddress=packet.getAddress();
+						if(packet.getSynFlag()){
+							
+							this.ackNumber=packet.getSequenceNumber()+1;
+							Packet sendPacket=new Packet(ackNumber,true,false,false,windowSize,packet.getAddress(),packet.getPort(),challenge);
+							parent.sendPacket(sendPacket);
+							state=State.SYN_RCVD;
+						}
 					}
+					break;
 				
 			case SYN_RCVD:
+				System.out.println("SYN_RCVD");
+
 				try{
+					if(repeatCount %400==0){
+						state=State.LISTEN;
+						break;
+					}
 					if(repeatCount %40 == 0){
 						Packet sendPacket = new Packet(this.ackNumber, 
 								true, false, false, 0, connectionAddress,
 								connectionPort, challenge);
 						parent.sendPacket(sendPacket);
 					}
-					Packet packet1 = this.packetList.pop();
-					if(packet1.getAddress()==connectionAddress){
-						MessageDigest md = MessageDigest.getInstance("MD5");
-						challengeAns = md.digest(challenge);
-						challengeAnswer=packet1.getData();
-						state=State.CHAL_CHCK;
+					if(packetList.size()>0){
+						Packet packet1 = this.packetList.pop();
+						if(packet1.getAddress()==connectionAddress){
+							MessageDigest md = MessageDigest.getInstance("MD5");
+							challengeAns = md.digest(challenge);
+							challengeAnswer=packet1.getData();
+							//state=State.CHAL_CHCK;
+							if(challengeAns==challengeAnswer){
+								Packet sendPacket=new Packet(this.sequenceNumber,false,false,true, windowSize, connectionAddress, portNumber, null);
+								parent.sendPacket(sendPacket);  
+							}else{
+								Packet sendPacket=new Packet(this.sequenceNumber,false,true,false,windowSize,connectionAddress,portNumber,null);
+								parent.sendPacket(sendPacket);
+								state=State.LISTEN;
+							}
+						}
 					}   
 				}catch(IOException e){
 					e.printStackTrace();
-			}
-			repeatCount +=1;
-			case CHAL_CHCK:
+				}
+				break;
+			/*case CHAL_CHCK:
+				System.out.print("CHAL_CHCK");
+
 				try {				
 					if(challengeAns==challengeAnswer){
 						Packet sendPacket=new Packet(this.sequenceNumber,false,false,true, windowSize, connectionAddress, portNumber, null);
@@ -271,26 +297,34 @@ public class RxPSocket {
 				}catch(IOException e) {
 					e.printStackTrace();
 				}
+				break;
+			*/
 			case SYN_SENT2:
+				System.out.println("SYN_SENT2");
 				try{
+					if(repeatCount %400==0){
+						state=State.LISTEN;
+						break;
+					}
 					if(repeatCount %40 == 0){
 						Packet sendPacket = new Packet(this.sequenceNumber, 
 								false, false, true, 0, connectionAddress,
 								connectionPort, null);
 						parent.sendPacket(sendPacket);
 					}
-					Packet pack=this.packetList.pop();
-					if(pack.getAddress()==connectionAddress){
-						if(pack.getAckFlag()){
-							connectionEstablished=true;
-							state=State.ESTABLISHED;
-						}else{
-							break;
+					if(packetList.size()>0){
+						Packet pack=this.packetList.pop();
+						if(pack.getAddress()==connectionAddress){
+							if(pack.getAckFlag()){
+								connectionEstablished=true;
+								state=State.ESTABLISHED;
+							}
 						}
 					}
 				}catch(IOException e) {
 					e.printStackTrace();
 				}
+				break;
 			}
 			repeatCount +=1;
 		}
