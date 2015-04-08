@@ -259,10 +259,10 @@ public class RxPSocket {
 							challengeAnswer=packet1.getData();
 							//state=State.CHAL_CHCK;
 							if(challengeAns==challengeAnswer){
-								Packet sendPacket=new Packet(this.sequenceNumber,false,false,true, windowSize, connectionAddress, portNumber, null);
+								Packet sendPacket=new Packet(this.sequenceNumber,false,false,true, windowSize, packet1.getAddress(), packet1.getPort(), null);
 								parent.sendPacket(sendPacket);  
 							}else{
-								Packet sendPacket=new Packet(this.sequenceNumber,false,true,false,windowSize,connectionAddress,portNumber,null);
+								Packet sendPacket=new Packet(this.sequenceNumber,false,true,false,windowSize,packet1.getAddress(), packet1.getPort(),null);
 								parent.sendPacket(sendPacket);
 								state=State.LISTEN;
 							}
