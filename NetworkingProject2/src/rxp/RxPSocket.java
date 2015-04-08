@@ -225,12 +225,15 @@ public class RxPSocket {
 						parent.sendPacket(sendPacket);
 						state=State.SYN_RCVD;
 
-					}else{
-						break;
 					}
+					break;
 				
 			case SYN_RCVD:
 				try{
+					if(repeatCount %400==0){
+						state=State.LISTEN;
+						break;
+					}
 					if(repeatCount %40 == 0){
 						Packet sendPacket = new Packet(this.ackNumber, 
 								true, false, false, 0, connectionAddress,
@@ -246,8 +249,8 @@ public class RxPSocket {
 					}   
 				}catch(IOException e){
 					e.printStackTrace();
-			}
-			repeatCount +=1;
+				}
+				break;
 			case CHAL_CHCK:
 				try {				
 					if(challengeAns==challengeAnswer){
@@ -261,8 +264,13 @@ public class RxPSocket {
 				}catch(IOException e) {
 					e.printStackTrace();
 				}
+				break;
 			case SYN_SENT2:
 				try{
+					if(repeatCount %400==0){
+						state=State.LISTEN;
+						break;
+					}
 					if(repeatCount %40 == 0){
 						Packet sendPacket = new Packet(this.sequenceNumber, 
 								false, false, true, 0, connectionAddress,
@@ -274,13 +282,12 @@ public class RxPSocket {
 						if(pack.getAckFlag()){
 							connectionEstablished=true;
 							state=State.ESTABLISHED;
-						}else{
-							break;
 						}
 					}
 				}catch(IOException e) {
 					e.printStackTrace();
 				}
+				break;
 			}
 			repeatCount +=1;
 		}
