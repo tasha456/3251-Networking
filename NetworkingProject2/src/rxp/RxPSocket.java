@@ -191,8 +191,10 @@ public class RxPSocket {
 		}
 	}
 	public void listen(int portNumber,int windowSize) throws NoSuchAlgorithmException, IOException{
+
 		if(connectionEstablished == true){
 			//Throw an exception
+			
 		}
 		this.portNumber = portNumber;
 		this.windowSize = windowSize;
@@ -201,6 +203,7 @@ public class RxPSocket {
 		byte[] challenge = new byte[20];
 		byte[] challengeAns=null;
 		byte[] challengeAnswer=null;
+		InetAddress connectionAddress=null;
 		rand.nextBytes(challenge);
 		
 		try{
@@ -208,17 +211,19 @@ public class RxPSocket {
 			
 		} catch (IOException e) {
 			e.printStackTrace();
-		}
+		}	
+
 		while(this.state != State.ESTABLISHED){
-				
 			switch(this.state){
-			case LISTEN:
+			case LISTEN:		
 					Packet packet=this.packetList.pop();
+					connectionAddress=packet.getAddress();
 					if(packet.getSynFlag()){
 						this.ackNumber=packet.getSequenceNumber()+1;
-						Packet sendPacket=new Packet(ackNumber,true,false,false,windowSize,connectionAddress,portNumber,challenge);
+						Packet sendPacket=new Packet(ackNumber,true,false,false,windowSize,packet.getAddress(),packet.getPort(),challenge);
 						parent.sendPacket(sendPacket);
 						state=State.SYN_RCVD;
+
 					}else{
 						break;
 					}
@@ -231,11 +236,13 @@ public class RxPSocket {
 								connectionPort, challenge);
 						parent.sendPacket(sendPacket);
 					}
-				Packet packet1 = this.packetList.pop();
-				MessageDigest md = MessageDigest.getInstance("MD5");
-				challengeAns = md.digest(challenge);
-				challengeAnswer=packet1.getData();
-				state=State.CHAL_CHCK;
+					Packet packet1 = this.packetList.pop();
+					if(packet1.getAddress()==connectionAddress){
+						MessageDigest md = MessageDigest.getInstance("MD5");
+						challengeAns = md.digest(challenge);
+						challengeAnswer=packet1.getData();
+						state=State.CHAL_CHCK;
+					}
 				}catch(IOException e){
 					e.printStackTrace();
 			}
@@ -261,17 +268,20 @@ public class RxPSocket {
 								connectionPort, null);
 						parent.sendPacket(sendPacket);
 					}
-				Packet pack=this.packetList.pop();
-				if(pack.getAckFlag()){
-					connectionEstablished=true;
-					state=State.ESTABLISHED;
-				}else{
-					break;
-				}
+					Packet pack=this.packetList.pop();
+					if(pack.getAddress()==connectionAddress){
+						if(pack.getAckFlag()){
+							connectionEstablished=true;
+							state=State.ESTABLISHED;
+						}else{
+							break;
+						}
+					}
 				}catch(IOException e) {
 					e.printStackTrace();
 				}
 			}
+			repeatCount +=1;
 		}
 			
 	}
