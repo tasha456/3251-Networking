@@ -243,7 +243,7 @@ public class RxPSocket {
 						challengeAns = md.digest(challenge);
 						challengeAnswer=packet1.getData();
 						state=State.CHAL_CHCK;
-					}
+					}   
 				}catch(IOException e){
 					e.printStackTrace();
 			}
