@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 
 import rxp.*;
+import rxpexceptions.ConcurrentListenException;
 
 public class RxPParent implements Runnable{
 
@@ -38,7 +39,6 @@ public class RxPParent implements Runnable{
 				int len = rawPacket.getLength();
 				byte[] actualPacket = new byte[len];
 				System.arraycopy(rawPacket.getData(),0, actualPacket, 0, len);
-				System.out.println("Packet received");
 				InetAddress sourceAddress = rawPacket.getAddress();
 				int portNumber = rawPacket.getPort();
 				Packet packet = new Packet(actualPacket,sourceAddress,portNumber);
@@ -81,7 +81,6 @@ public class RxPParent implements Runnable{
 			byte[] data = packet.getRawBytes();
 			DatagramPacket datagram = new DatagramPacket(data,data.length,
 					packet.getAddress(),packet.getPort());
-			System.out.println("SENDING TO " + packet.getPort());
 			try {
 				this.socket.send(datagram);
 			} catch (IOException e) {
@@ -105,12 +104,11 @@ public class RxPParent implements Runnable{
 			}
 		}
 	}
-	private void addRxPSocket(RxPSocket socket){
+	private void addRxPSocket(RxPSocket socket) throws ConcurrentListenException{
 		if(listeningSocket == null){
 			this.listeningSocket = socket;
 		} else{
-			//throw error because trying to establish multiple connections on the
-			//same socket, at the same time instead of iteratively
+			throw new ConcurrentListenException();
 		}
 	}
 	private String createKey(Packet packet){
@@ -122,7 +120,7 @@ public class RxPParent implements Runnable{
 	private String createKey(InetAddress address,int socket){
 		return address.toString() + socket;
 	}
-	public static RxPParent addSocket(RxPSocket socket,int portNumber) throws SocketException{
+	public static RxPParent addSocket(RxPSocket socket,int portNumber) throws SocketException, ConcurrentListenException{
 		if(parentSocket == null){
 			parentSocket = new HashMap<Integer,RxPParent>();
 		}

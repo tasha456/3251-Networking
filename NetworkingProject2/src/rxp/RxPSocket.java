@@ -10,6 +10,8 @@ import java.security.NoSuchAlgorithmException;
 import java.util.LinkedList;
 import java.util.Random;
 
+import rxpexceptions.*;
+
 public class RxPSocket {
 	
 	public static final int MAXIMUM_PACKET_SIZE = 300;
@@ -37,7 +39,6 @@ public class RxPSocket {
 	}
 	public void receivePacket(Packet packet){
 		System.out.println("Received packet:");
-		System.out.println(packet.toString());
 		if(packet.getIsCorrupted()){
 			return; //treat corrupted packets as lost packets
 		}
@@ -100,13 +101,13 @@ public class RxPSocket {
 		this.sender = new RxPSender(connectionAddress, connectionPort);
 		this.receiver = new RxPReceiver(500, connectionAddress, connectionPort, parent);
 	}
-	public void connect(int portNumber,InetAddress connectionAddress,int destinationPort,int windowSize){
+	public void connect(int portNumber,InetAddress connectionAddress,int destinationPort,int windowSize) throws ValidationException, ConcurrentListenException, InvalidStateException{
 		this.connectionAddress = connectionAddress;
 		this.connectionPort = destinationPort;
 		int repeatCount = 0;
 		byte[] challengeAnswer = null;
 		if(state != State.CLOSED){
-			return; //can't connect if you're not in closed. throw some exception
+			throw new InvalidStateException();
 		} else{
 			try {
 				this.parent = RxPParent.addSocket(this, portNumber);
@@ -148,7 +149,6 @@ public class RxPSocket {
 			Packet packet = this.packetList.pop();
 			switch(this.state){
 			case SYN_SENT:
-				System.out.println("SYN_SENT");
 				if(packet.getAddress().equals(this.connectionAddress)){
 					byte[] challenge = packet.getData();		
 					if(packet.getAckFlag() == true && challenge != null &&
@@ -191,11 +191,10 @@ public class RxPSocket {
 									connectionPort,null);
 							parent.sendPacket(sendPacket);
 							state = State.ESTABLISHED;
-							System.out.println("YAY");
 							return;
 						} else if(packet.getFinFlag()){
 							state = State.CLOSED;
-							return; //TODO this is a failure to authenticate. throw exception or something
+							throw new ValidationException();
 						}
 					}
 				} catch(IOException e){
@@ -206,7 +205,7 @@ public class RxPSocket {
 			repeatCount +=1;
 		}
 	}
-	public void listen(int portNumber,int windowSize) throws NoSuchAlgorithmException, IOException, InterruptedException{
+	public void listen(int portNumber,int windowSize) throws IOException, ConcurrentListenException{
 
 		if(connectionEstablished == true){
 			//Throw an exception
@@ -233,7 +232,6 @@ public class RxPSocket {
 			
 			switch(this.state){
 			case CLOSED:
-				System.out.println("CLOSED");
 
 					state=State.LISTEN;
 			case LISTEN:	
@@ -254,7 +252,6 @@ public class RxPSocket {
 					break;
 				
 			case SYN_RCVD:
-				System.out.println("SYN_RCVD");
 
 				try{
 					if(repeatCount %400==0){
@@ -299,6 +296,8 @@ public class RxPSocket {
 					}   
 				}catch(IOException e){
 					e.printStackTrace();
+				} catch (NoSuchAlgorithmException e) {
+					throw new IOException("Failed to find MD5 algorithm");
 				}
 				break;
 			/*case CHAL_CHCK:
@@ -319,7 +318,6 @@ public class RxPSocket {
 				break;
 			*/
 			case SYN_SENT2:
-				System.out.println("SYN_SENT2");
 				try{
 					if(repeatCount %400==0){
 						state=State.LISTEN;
@@ -337,7 +335,6 @@ public class RxPSocket {
 							if(pack.getAckFlag()&&!pack.getFinFlag()&&!pack.getSynFlag()){
 								connectionEstablished=true;
 								state=State.ESTABLISHED;
-								System.out.println("YAY");
 							}
 						}
 					}
@@ -347,7 +344,11 @@ public class RxPSocket {
 				break;
 			}
 			repeatCount +=1;
-			Thread.sleep(100);
+			try {
+				Thread.sleep(100);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
 		}
 			
 	}

@@ -47,7 +47,6 @@ public class Packet {
 	 * @param portNumber
 	 */
 	public Packet(byte[] rawBytes,InetAddress address,int portNumber){
-		System.out.println(rawBytes.length);
 		this.rawBytes = rawBytes;
 		this.address = address;
 		this.portNumber = portNumber;
@@ -114,7 +113,6 @@ public class Packet {
 		try {
 			MessageDigest md = MessageDigest.getInstance("SHA-1");
 			this.errorDetection = md.digest(adjustedBytes);
-			System.out.println(errorDetection.length);
 		} catch (NoSuchAlgorithmException e) {
 			e.printStackTrace();
 			return null; //failed to hash...for some unknown reason
