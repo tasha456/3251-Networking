@@ -345,8 +345,9 @@ public class RxPSocket {
 						if(pack.getAddress().equals(connectionAddress)){
 							if(pack.getAckFlag()&&!pack.getFinFlag()&&!pack.getSynFlag()){
 								connectionEstablished=true;
-								establishedSetup();
 								state=State.ESTABLISHED;
+								this.sequenceNumber = this.sequenceNumber + 1;
+								establishedSetup();
 								parent.addConnectedSocket(this);
 							}
 						}

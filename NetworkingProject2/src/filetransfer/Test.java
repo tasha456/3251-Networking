@@ -41,6 +41,16 @@ public class Test {
 		}
 		while(true){
 			Scanner scanner = new Scanner(System.in);
+			String line = scanner.nextLine();
+			if(line.startsWith("send ")){
+				line = line.replace("send ", "");
+				socket.send(line.getBytes());
+			}
+			else if(line.startsWith("read")){
+				byte[] temp = new byte[200];
+				socket.read(temp);
+				System.out.println(new String(temp));
+			}
 		}
 	}
 }

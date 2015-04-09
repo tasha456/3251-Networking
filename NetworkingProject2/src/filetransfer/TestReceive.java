@@ -3,6 +3,7 @@ package filetransfer;
 import java.io.IOException;
 import java.net.SocketException;
 import java.security.NoSuchAlgorithmException;
+import java.util.Scanner;
 
 import rxp.*;
 import rxpexceptions.ConcurrentListenException;
@@ -25,17 +26,18 @@ public class TestReceive {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-//		System.out.println("Ready");
-//		byte[] temp = new byte[2];
-//		while(true){
-//			int num = socket.read(temp);
-//			System.out.println("Read " + num + " bytes: " + new String(temp));
-//			try {
-//				Thread.sleep(4000);
-//			} catch (InterruptedException e) {
-//				// TODO Auto-generated catch block
-//				e.printStackTrace();
-//			}
-//		}
+		while(true){
+			Scanner scanner = new Scanner(System.in);
+			String line = scanner.nextLine();
+			if(line.startsWith("send ")){
+				line = line.replace("send ", "");
+				socket.send(line.getBytes());
+			}
+			else if(line.startsWith("read")){
+				byte[] temp = new byte[200];
+				socket.read(temp);
+				System.out.println(new String(temp));
+			}
+		}
 	}
 }
