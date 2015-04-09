@@ -66,6 +66,7 @@ public class RxPParent implements Runnable{
 		if(rxpSocket.containsKey(createKey(socket)) == false){
 			if(listeningSocket.equals(socket)){
 				rxpSocket.put(createKey(socket), socket);
+				
 				listeningSocket = null;
 				return true;
 			}
@@ -74,6 +75,13 @@ public class RxPParent implements Runnable{
 		return true;
 	}
 	private void sendQueuedPackets(){
+		for(RxPSocket item:rxpSocket.values()){
+			try {
+				item.update(socket.getSoTimeout());
+			} catch (SocketException e) {
+				e.printStackTrace();
+			}
+		}
 		int packetLength = packetList.size();
 		int i = 0;
 		while(i< packetLength){
@@ -101,6 +109,8 @@ public class RxPParent implements Runnable{
 		} else{
 			if(listeningSocket != null){
 				listeningSocket.receivePacket(packet);
+			} else{
+				System.out.println("received packet for unknown socket");
 			}
 		}
 	}
@@ -118,7 +128,7 @@ public class RxPParent implements Runnable{
 		return createKey(socket.getDestinationAddress(),socket.getDestinationPort());
 	}
 	private String createKey(InetAddress address,int socket){
-		return address.toString() + socket;
+		return address.toString().replace("localhost", "") + socket;
 	}
 	public static RxPParent addSocket(RxPSocket socket,int portNumber) throws SocketException, ConcurrentListenException{
 		if(parentSocket == null){

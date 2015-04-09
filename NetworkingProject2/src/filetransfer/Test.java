@@ -3,6 +3,8 @@ package filetransfer;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.util.Random;
+import java.util.Scanner;
 
 import rxp.*;
 import rxpexceptions.ConcurrentListenException;
@@ -16,8 +18,7 @@ public class Test {
 		RxPSocket socket = new RxPSocket();
 		try {
 			InetAddress address = InetAddress.getByName("localhost");
-			socket.connect(9999,address,9998, 10000);
-			System.out.println("Stopped blocking");
+			socket.connect(9994,address,9993, 10000);
 		} catch (ValidationException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -30,6 +31,16 @@ public class Test {
 		} catch (UnknownHostException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
+		}
+		System.out.println("-----------Ready--------------");
+		try {
+			Thread.sleep(1000);
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		while(true){
+			Scanner scanner = new Scanner(System.in);
 		}
 	}
 }

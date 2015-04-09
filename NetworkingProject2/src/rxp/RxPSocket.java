@@ -37,8 +37,17 @@ public class RxPSocket {
 		this.state = State.CLOSED;
 		this.packetList = new LinkedList<Packet>();
 	}
+	public void update(int deltaT){
+		if(sender != null)
+			sender.update(deltaT);
+	}
+	public void send(byte[] data){
+		sender.send(data);
+	}
+	public int read(byte[] data){
+		return receiver.readData(data);
+	}
 	public void receivePacket(Packet packet){
-		System.out.println("Received packet:");
 		if(packet.getIsCorrupted()){
 			return; //treat corrupted packets as lost packets
 		}
@@ -98,8 +107,9 @@ public class RxPSocket {
 	 * This method MUST be called before entering into the established state.
 	 */
 	public void establishedSetup(){
-		this.sender = new RxPSender(connectionAddress, connectionPort);
-		this.receiver = new RxPReceiver(500, connectionAddress, connectionPort, parent);
+		this.sender = new RxPSender(this.sequenceNumber,connectionAddress, connectionPort, parent);
+		this.receiver = new RxPReceiver(500, this.ackNumber,
+				connectionAddress, connectionPort, parent,this.sender);
 	}
 	public void connect(int portNumber,InetAddress connectionAddress,int destinationPort,int windowSize) throws ValidationException, ConcurrentListenException, InvalidStateException{
 		this.connectionAddress = connectionAddress;
@@ -149,6 +159,7 @@ public class RxPSocket {
 			Packet packet = this.packetList.pop();
 			switch(this.state){
 			case SYN_SENT:
+				this.sequenceNumber++;
 				if(packet.getAddress().equals(this.connectionAddress)){
 					byte[] challenge = packet.getData();		
 					if(packet.getAckFlag() == true && challenge != null &&
@@ -191,6 +202,8 @@ public class RxPSocket {
 									connectionPort,null);
 							parent.sendPacket(sendPacket);
 							state = State.ESTABLISHED;
+							establishedSetup();
+							parent.addConnectedSocket(this);
 							return;
 						} else if(packet.getFinFlag()){
 							state = State.CLOSED;
@@ -205,10 +218,10 @@ public class RxPSocket {
 			repeatCount +=1;
 		}
 	}
-	public void listen(int portNumber,int windowSize) throws IOException, ConcurrentListenException{
+	public void listen(int portNumber,int windowSize) throws IOException, ConcurrentListenException, InvalidStateException{
 
 		if(connectionEstablished == true){
-			//Throw an exception
+			throw new InvalidStateException();
 			
 		}
 		this.portNumber = portNumber;
@@ -218,7 +231,6 @@ public class RxPSocket {
 		byte[] challenge = new byte[20];
 		byte[] challengeAns=null;
 		byte[] challengeAnswer=null;
-		InetAddress connectionAddress=null;
 		rand.nextBytes(challenge);
 
 		
@@ -239,10 +251,9 @@ public class RxPSocket {
 
 					if(packetList.size()>0){
 						Packet packet=this.packetList.pop();
-						connectionAddress=packet.getAddress();
-						connectionPort=packet.getPort();
 						if(packet.getSynFlag()&&!packet.getFinFlag()&&!packet.getAckFlag()){
-							
+							connectionAddress=packet.getAddress();
+							connectionPort=packet.getPort();
 							this.ackNumber=packet.getSequenceNumber()+1;
 							Packet sendPacket=new Packet(ackNumber,true,false,false,windowSize,connectionAddress,connectionPort,challenge);
 							parent.sendPacket(sendPacket);
@@ -334,7 +345,9 @@ public class RxPSocket {
 						if(pack.getAddress().equals(connectionAddress)){
 							if(pack.getAckFlag()&&!pack.getFinFlag()&&!pack.getSynFlag()){
 								connectionEstablished=true;
+								establishedSetup();
 								state=State.ESTABLISHED;
+								parent.addConnectedSocket(this);
 							}
 						}
 					}
