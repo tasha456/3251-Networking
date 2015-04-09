@@ -70,8 +70,10 @@ public class RxPSocket {
 			break;
 		case ESTABLISHED:
 			this.receiver.receivePacket(packet);
+			
 			break;
 		case CLOSED_WAIT:
+			packetList.add(packet);
 			break;
 		case LAST_ACK:
 			break;
@@ -85,8 +87,10 @@ public class RxPSocket {
 			packetList.add(packet);
 			break;
 		case FIN_WAIT1:
+			packetList.add(packet);
 			break;
 		case FIN_WAIT2:
+			packetList.add(packet);
 			break;
 		case TIMED_WAIT:
 			break;
@@ -217,6 +221,90 @@ public class RxPSocket {
 			}
 			repeatCount +=1;
 		}
+	}
+	public void close() throws InvalidStateException, IOException{
+		if(this.state!=State.ESTABLISHED){
+			throw new InvalidStateException();
+		}
+		while (this.state!=state.CLOSED){
+			switch(state){
+			case ESTABLISHED:
+				if(packetList.size()>0){
+					Packet packet=packetList.pop();
+					connectionAddress=packet.getAddress();
+					connectionPort=packet.getPort();
+					if(packet.getFinFlag()&&!packet.getSynFlag()&&!packet.getAckFlag()){
+						this.ackNumber=packet.getSequenceNumber()+1;
+						Packet sendAck=new Packet(ackNumber,true, false,false,windowSize, connectionAddress,connectionPort,null);
+						parent.sendPacket(sendAck);
+						this.state=State.CLOSED_WAIT;
+					}	
+				}else{
+					Packet sendFin=new Packet(this.sequenceNumber,false,true,false,windowSize,connectionAddress,connectionPort,null);
+					parent.sendPacket(sendFin);
+					this.state=State.FIN_WAIT1;
+				}
+				break;
+			case FIN_WAIT1:
+				if(packetList.size()>0){
+						Packet packet=packetList.pop();
+						connectionAddress=packet.getAddress();
+						connectionPort=packet.getPort();
+						if(packet.getAckFlag()&&!packet.getSynFlag()&&!packet.getFinFlag()){
+							this.state=State.FIN_WAIT2;
+						}
+						if(!packet.getAckFlag()&&!packet.getSynFlag()&&packet.getFinFlag()){
+							ackNumber=packet.getSequenceNumber()+1;
+							Packet sendAck=new Packet(ackNumber,true,false,false,windowSize,connectionAddress,connectionPort,null);
+							parent.sendPacket(sendAck);
+							this.state=State.CLOSING;
+						}
+				}
+				break;
+				
+			case FIN_WAIT2:
+				if(packetList.size()>0){
+					Packet packet=packetList.pop();
+					connectionAddress=packet.getAddress();
+					connectionPort=packet.getPort();
+					if(!packet.getAckFlag()&&!packet.getSynFlag()&&packet.getFinFlag()){
+						ackNumber=packet.getSequenceNumber()+1;
+						Packet sendAck=new Packet(ackNumber,true,false,false,windowSize,connectionAddress,connectionPort,null);
+						parent.sendPacket(sendAck);
+						this.state=State.TIMED_WAIT;
+					}
+				}
+				break;
+			case CLOSING:
+				if(packetList.size()>0){
+					Packet packet=packetList.pop();
+					connectionAddress=packet.getAddress();
+					connectionPort=packet.getPort();
+					if(packet.getAckFlag()&&!packet.getSynFlag()&&!packet.getFinFlag()){
+						this.state=State.TIMED_WAIT;
+					}
+				}
+				break;
+			case CLOSED_WAIT:
+				Packet sendFin=new Packet(this.sequenceNumber,false,true,false,windowSize,connectionAddress,connectionPort,null);
+				parent.sendPacket(sendFin);
+				this.state=State.LAST_ACK;
+				break;
+			case LAST_ACK:
+				if(packetList.size()>0){
+					Packet packet=packetList.pop();
+					connectionAddress=packet.getAddress();
+					connectionPort=packet.getPort();
+					if(packet.getAckFlag()&&!packet.getSynFlag()&&!packet.getFinFlag()){
+						this.state=State.CLOSED;
+					}
+				}
+				break;
+			case TIMED_WAIT:
+				break;
+			}
+		}		
+
 	}
 	public void listen(int portNumber,int windowSize) throws IOException, ConcurrentListenException, InvalidStateException{
 
