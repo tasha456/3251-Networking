@@ -49,11 +49,14 @@ public class RxPSocket {
 			packetList.add(packet);
 			break;
 		case SYN_RCVD:
+			packetList.add(packet);
 			break;
 		case CHAL_CHCK:
 			packetList.add(packet);
 			break;
 		case SYN_SENT2:
+			packetList.add(packet);
+
 			break;
 		case ESTABLISHED:
 			this.receiver.receivePacket(packet);
@@ -147,7 +150,7 @@ public class RxPSocket {
 			case SYN_SENT:
 				System.out.println("SYN_SENT");
 				if(packet.getAddress().equals(this.connectionAddress)){
-					byte[] challenge = packet.getData();
+					byte[] challenge = packet.getData();		
 					if(packet.getAckFlag() == true && challenge != null &&
 							challenge.length > 0){
 						//send challenge response
@@ -188,6 +191,7 @@ public class RxPSocket {
 									connectionPort,null);
 							parent.sendPacket(sendPacket);
 							state = State.ESTABLISHED;
+							System.out.println("YAY");
 							return;
 						} else if(packet.getFinFlag()){
 							state = State.CLOSED;
@@ -202,7 +206,7 @@ public class RxPSocket {
 			repeatCount +=1;
 		}
 	}
-	public void listen(int portNumber,int windowSize) throws NoSuchAlgorithmException, IOException{
+	public void listen(int portNumber,int windowSize) throws NoSuchAlgorithmException, IOException, InterruptedException{
 
 		if(connectionEstablished == true){
 			//Throw an exception
@@ -217,6 +221,7 @@ public class RxPSocket {
 		byte[] challengeAnswer=null;
 		InetAddress connectionAddress=null;
 		rand.nextBytes(challenge);
+
 		
 		try{
 			this.parent=RxPParent.addSocket(this, portNumber);			
@@ -237,10 +242,11 @@ public class RxPSocket {
 					if(packetList.size()>0){
 						Packet packet=this.packetList.pop();
 						connectionAddress=packet.getAddress();
-						if(packet.getSynFlag()){
+						connectionPort=packet.getPort();
+						if(packet.getSynFlag()&&!packet.getFinFlag()&&!packet.getAckFlag()){
 							
 							this.ackNumber=packet.getSequenceNumber()+1;
-							Packet sendPacket=new Packet(ackNumber,true,false,false,windowSize,packet.getAddress(),packet.getPort(),challenge);
+							Packet sendPacket=new Packet(ackNumber,true,false,false,windowSize,connectionAddress,connectionPort,challenge);
 							parent.sendPacket(sendPacket);
 							state=State.SYN_RCVD;
 						}
@@ -263,14 +269,27 @@ public class RxPSocket {
 					}
 					if(packetList.size()>0){
 						Packet packet1 = this.packetList.pop();
-						if(packet1.getAddress()==connectionAddress){
+						challengeAnswer=packet1.getData();
+						//System.out.println(challengeAnswer);
+
+						if(packet1.getAddress().equals(connectionAddress)&& challengeAnswer != null &&
+								challengeAnswer.length > 0){
 							MessageDigest md = MessageDigest.getInstance("MD5");
 							challengeAns = md.digest(challenge);
-							challengeAnswer=packet1.getData();
+
 							//state=State.CHAL_CHCK;
-							if(challengeAns==challengeAnswer){
+							//System.out.println(challengeAns);
+							//System.out.println(challengeAns.equals(challengeAnswer));
+							boolean notEqual=false;
+							for(int i=0;i<challengeAns.length;i++){
+								if(challengeAns[i]!=challengeAnswer[i]){
+									notEqual=true;
+								}
+							}
+							if(!notEqual){
 								Packet sendPacket=new Packet(this.sequenceNumber,false,false,true, windowSize, packet1.getAddress(), packet1.getPort(), null);
 								parent.sendPacket(sendPacket);  
+								state=State.SYN_SENT2;
 							}else{
 								Packet sendPacket=new Packet(this.sequenceNumber,false,true,false,windowSize,packet1.getAddress(), packet1.getPort(),null);
 								parent.sendPacket(sendPacket);
@@ -314,10 +333,11 @@ public class RxPSocket {
 					}
 					if(packetList.size()>0){
 						Packet pack=this.packetList.pop();
-						if(pack.getAddress()==connectionAddress){
-							if(pack.getAckFlag()){
+						if(pack.getAddress().equals(connectionAddress)){
+							if(pack.getAckFlag()&&!pack.getFinFlag()&&!pack.getSynFlag()){
 								connectionEstablished=true;
 								state=State.ESTABLISHED;
+								System.out.println("YAY");
 							}
 						}
 					}
@@ -327,9 +347,12 @@ public class RxPSocket {
 				break;
 			}
 			repeatCount +=1;
+			Thread.sleep(100);
 		}
 			
 	}
+	
+	
 		
 		
 		

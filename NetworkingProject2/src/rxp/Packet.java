@@ -126,7 +126,7 @@ public class Packet {
 		System.arraycopy(this.errorDetection, 0, answer, 
 				HEADER_LENGTH-ERROR_DETECTION_LENGTH,ERROR_DETECTION_LENGTH);
 		this.rawBytes = answer;
-		System.out.println(this.toString());
+		// System.out.println(this.toString());
 		return answer;
 	}
 	public long getSequenceNumber(){

@@ -88,6 +88,7 @@ public class RxPParent implements Runnable{
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
+			i++;
 		}
 	}
 	public void sendPacket(Packet packet) throws IOException{
