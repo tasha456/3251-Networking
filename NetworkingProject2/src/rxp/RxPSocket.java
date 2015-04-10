@@ -28,7 +28,8 @@ public class RxPSocket {
 	private RxPSender sender;
 	boolean connectionEstablished;
 	private LinkedList<Packet> packetList;
-	private int windowSize;
+	private int startingWindowSize;
+	private int startingConnectionWindowSize;
 	private int portNumber;
 	
 	
@@ -40,6 +41,8 @@ public class RxPSocket {
 	public void update(int deltaT){
 		if(sender != null)
 			sender.update(deltaT);
+		if(receiver != null)
+			receiver.update(deltaT);
 	}
 	public void send(byte[] data){
 		sender.send(data);
@@ -107,13 +110,15 @@ public class RxPSocket {
 	 * This method MUST be called before entering into the established state.
 	 */
 	public void establishedSetup(){
-		this.sender = new RxPSender(this.sequenceNumber,connectionAddress, connectionPort, parent);
-		this.receiver = new RxPReceiver(500, this.ackNumber,
+		this.sender = new RxPSender(this.sequenceNumber,startingConnectionWindowSize,
+				connectionAddress, connectionPort, parent);
+		this.receiver = new RxPReceiver(this.startingWindowSize, this.ackNumber,
 				connectionAddress, connectionPort, parent,this.sender);
 	}
 	public void connect(int portNumber,InetAddress connectionAddress,int destinationPort,int windowSize) throws ValidationException, ConcurrentListenException, InvalidStateException{
 		this.connectionAddress = connectionAddress;
 		this.connectionPort = destinationPort;
+		this.startingWindowSize = windowSize;
 		int repeatCount = 0;
 		byte[] challengeAnswer = null;
 		if(state != State.CLOSED){
@@ -162,6 +167,7 @@ public class RxPSocket {
 				this.sequenceNumber++;
 				if(packet.getAddress().equals(this.connectionAddress)){
 					byte[] challenge = packet.getData();		
+					startingConnectionWindowSize = packet.getWindowSize();
 					if(packet.getAckFlag() == true && challenge != null &&
 							challenge.length > 0){
 						//send challenge response
@@ -225,7 +231,7 @@ public class RxPSocket {
 			
 		}
 		this.portNumber = portNumber;
-		this.windowSize = windowSize;
+		this.startingWindowSize = windowSize;
 		int repeatCount = 0;
 		Random rand = new Random();
 		byte[] challenge = new byte[20];
@@ -254,6 +260,7 @@ public class RxPSocket {
 						if(packet.getSynFlag()&&!packet.getFinFlag()&&!packet.getAckFlag()){
 							connectionAddress=packet.getAddress();
 							connectionPort=packet.getPort();
+							startingConnectionWindowSize = packet.getWindowSize();
 							this.ackNumber=packet.getSequenceNumber()+1;
 							Packet sendPacket=new Packet(ackNumber,true,false,false,windowSize,connectionAddress,connectionPort,challenge);
 							parent.sendPacket(sendPacket);

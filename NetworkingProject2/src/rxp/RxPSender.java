@@ -2,6 +2,8 @@ package rxp;
 import java.io.IOException;
 import java.net.*;
 import java.util.*;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 /**
  * This class runs on a seperate thread to handle outgoing RxP Packets
  *
@@ -9,6 +11,7 @@ import java.util.*;
 public class RxPSender{
 
 	InetAddress dest;
+	boolean pseudoPacket;
 	int portNumber;
 	int windowSize;
 	LinkedList<byte[]> list;
@@ -17,42 +20,90 @@ public class RxPSender{
 	int PACKET_LENGTH=300;
 	int TIMEOUT = 10000;
 	long sequenceNumber;
+	long sentSequenceNumber;
 	RxPParent parent;
+	private final Lock lock = new ReentrantLock();
+	public static final int CONTROL_SEQUENCE_NUMBER = 0;
 
-	public RxPSender(long sequenceNumber,InetAddress dest, int portNumber, RxPParent parent){
+	public RxPSender(long sequenceNumber,int windowSize,InetAddress dest, int portNumber, RxPParent parent){
 		//this.data=new byte[numOfBytes];
+		this.windowSize = windowSize;
 		this.dest=dest;
 		this.sequenceNumber = sequenceNumber;
+		this.sentSequenceNumber = sequenceNumber;
 		this.portNumber=portNumber;
-		list= new LinkedList<byte[]>();
 		Random rand=new Random();
 		rand.nextLong();
 		this.parent = parent;
 		this.packetList = new LinkedList<Packet>();
 		this.timer = new LinkedList<Integer>();
+		this.pseudoPacket = false;
 	}
 	/**
 	 * 
 	 * @param deltaT number of miliseconds since the last update
 	 */
 	public void update(int deltaT){
+		lock.lock();
+		sendPseudoPacket();
+		sendUnsentPackets();
 		int index = 0;
 		while(index < timer.size()){
 			int temp = timer.get(index) + deltaT;
 			if(temp >= TIMEOUT){
 				timer.set(index, 0);
-				try {
-					parent.sendPacket(packetList.get(index));
-				} catch (IOException e) {
-					e.printStackTrace();
+				if(packetList.get(index).getHasSent()){
+					try {
+						parent.sendPacket(packetList.get(index));
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
 				}
 			} else{
 				timer.set(index, temp);
 			}
 			index++;
 		}
+		lock.unlock();
+	}
+	private void sendUnsentPackets(){
+		int index = 0;
+		while(index < packetList.size()){
+			Packet packet = packetList.get(index);
+			if(packet.getHasSent() == false){
+				if(windowSize > 0){ //put a lock for window size in update and send (2 seperate threads)
+					windowSize = windowSize - packet.getData().length;
+					packet.send();
+					timer.set(index, 0);
+					try {
+						if(packet.getData() != null){
+							sentSequenceNumber = Math.max(sentSequenceNumber, 
+									packet.getSequenceNumber() + packet.getData().length);
+						} else{
+							sentSequenceNumber = Math.max(sentSequenceNumber, packet.getSequenceNumber());
+						}
+						parent.sendPacket(packetList.get(index));
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				}
+			}
+			index++;
+		}
+	}
+	private void sendPseudoPacket(){
+		if(windowSize == 0 && pseudoPacket == false){
+			Packet packet = new Packet(sequenceNumber,false,false,false,0,dest,portNumber,null);
+			packet.send();
+			packetList.add(packet);
+			timer.add(0);
+			pseudoPacket = true;
+		}
 	}
 	public void send(byte[] toSend){
+		lock.lock();
+		sendPseudoPacket();
+		sendUnsentPackets();
 		int index= 0;
 		while(index < toSend.length){
 			int length = PACKET_LENGTH;
@@ -61,29 +112,56 @@ public class RxPSender{
 			}
 			byte[] temp = new byte[length];
 			System.arraycopy(toSend, index, temp, 0, length);
-			Packet packet = new Packet(sequenceNumber, false, false, false, windowSize, dest, portNumber, temp);
+			Packet packet = new Packet(sequenceNumber, false, false, false, 0, dest, portNumber, temp);
 			sequenceNumber += temp.length;
 			packetList.add(packet);
 			timer.add(0);
-			try {
-				parent.sendPacket(packet);
-			} catch (IOException e) {
-				e.printStackTrace();
+			if(windowSize > 0){
+				System.out.println("Sending");
+				try {
+					parent.sendPacket(packet);
+					packet.send();
+					windowSize = windowSize - packet.getData().length;
+					if(packet.getData() != null){
+						sentSequenceNumber = Math.max(sentSequenceNumber, 
+								packet.getSequenceNumber() + packet.getData().length);
+					} else{
+						sentSequenceNumber = Math.max(sentSequenceNumber, packet.getSequenceNumber());
+					}
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			} else{
+				System.out.println("Window size too small, packet will be sent later.");
 			}
 			index+=length;
 		}
-		list.add(toSend);
+		lock.unlock();
 	}
-	public void acknowledge(long synNumber){
+	public void acknowledge(long synNumber,int packetWindow){
+		System.out.println("ACK " + synNumber);
+		lock.lock();
 		int index = 0;
 		while(index < packetList.size()){
-			if(packetList.get(index).getSequenceNumber() == synNumber - packetList.get(index).getData().length){
-				packetList.remove(index);
-				timer.remove(index);
-				break;
+			if(packetList.get(index).getData() != null){
+				if(packetList.get(index).getSequenceNumber() == synNumber - packetList.get(index).getData().length){
+					packetList.remove(index);
+					timer.remove(index);
+					break;
+				}
+			} else{
+				if(packetList.get(index).getSequenceNumber() == synNumber){
+					packetList.remove(index);
+					timer.remove(index);
+					pseudoPacket = false;
+					break;
+				}
 			}
 			index++;
 		}
+		this.windowSize = packetWindow - (int)(sentSequenceNumber - synNumber);
+		System.out.println("windowSize: " + this.windowSize);
+		lock.unlock();
 	}
 //	@Override
 //	public void run(){

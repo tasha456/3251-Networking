@@ -15,7 +15,7 @@ public class TestReceive {
 		System.out.println("RECEIVING STUFF");
 		RxPSocket socket = new RxPSocket();
 		try {
-			socket.listen(9993, 10000);
+			socket.listen(9993, 20);
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -37,6 +37,9 @@ public class TestReceive {
 				byte[] temp = new byte[200];
 				socket.read(temp);
 				System.out.println(new String(temp));
+			}
+			else if(line.startsWith("end")){
+				break;
 			}
 		}
 	}

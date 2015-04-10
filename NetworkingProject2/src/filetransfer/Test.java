@@ -51,6 +51,9 @@ public class Test {
 				socket.read(temp);
 				System.out.println(new String(temp));
 			}
+			else if(line.startsWith("end")){
+				System.exit(0);
+			}
 		}
 	}
 }

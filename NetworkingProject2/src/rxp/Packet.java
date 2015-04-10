@@ -15,6 +15,7 @@ public class Packet {
 	boolean finFlag;
 	boolean synFlag;
 	boolean isCorrupted;
+	boolean hasSent;
 	InetAddress address;
 	int portNumber;
 	byte[] rawBytes;
@@ -132,7 +133,7 @@ public class Packet {
 	public long getSequenceNumber(){
 		return this.sequenceNumber;
 	}
-	public long getWindowSize(){
+	public int getWindowSize(){
 		return this.windowSize;
 	}
 	public byte[] getData(){
@@ -172,6 +173,12 @@ public class Packet {
 			ans += String.format("%8s", Integer.toBinaryString(item & 0xFF)).replace(' ', '0') + "|";
 		}
 		return ans;
+	}
+	public void send(){
+		hasSent = true;
+	}
+	public boolean getHasSent(){
+		return hasSent;
 	}
 	/**
 	 * this method clears the errorDetection bytes out of the supplied array
