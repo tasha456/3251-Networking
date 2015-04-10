@@ -18,7 +18,7 @@ public class RxPSender{
 	LinkedList<Packet> packetList;
 	LinkedList<Integer> timer;
 	int PACKET_LENGTH=300;
-	int TIMEOUT = 1000;
+	int TIMEOUT = 10000;
 	long sequenceNumber;
 	long sentSequenceNumber;
 	RxPParent parent;
