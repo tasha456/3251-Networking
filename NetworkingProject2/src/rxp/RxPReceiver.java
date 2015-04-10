@@ -11,7 +11,6 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 public class RxPReceiver {
 
-	public static final int TIMEOUT = 100; //miliseconds before pseudo ack for window size update is sent.
 	Byte[] data;
 	int readIndex; //last index it read
 	int receiveIndex; //next index to write to
@@ -43,22 +42,6 @@ public class RxPReceiver {
 		this.windowSize = data.length;
 		readIndex = -1;
 		receiveIndex = 0;
-	}
-	/**
-	 * This is used to check if a pseudoAck needs to be sent.
-	 * @param deltaT the time difference since the last time this method was called.
-	 */
-	public void update(int deltaT){
-		//timeDifference += deltaT;
-		if(timeDifference >= TIMEOUT){
-			timeDifference = 0;
-			Packet packet = new Packet(indexOffset-1, true, false, false, this.windowSize, address, port, null);
-			try {
-				parent.sendPacket(packet);
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		}
 	}
 	/**
 	 * takes in a packet, and if there is space in the buffer it will store the data inside the packet.

@@ -18,7 +18,7 @@ public class Test {
 		RxPSocket socket = new RxPSocket();
 		try {
 			InetAddress address = InetAddress.getByName("localhost");
-			socket.connect(9994,address,9993, 10000);
+			socket.connect(9992,address,9000, 10000);
 		} catch (ValidationException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();

@@ -41,8 +41,6 @@ public class RxPSocket {
 	public void update(int deltaT){
 		if(sender != null)
 			sender.update(deltaT);
-		if(receiver != null)
-			receiver.update(deltaT);
 	}
 	public void send(byte[] data){
 		sender.send(data);
@@ -154,7 +152,7 @@ public class RxPSocket {
 			}
 			if(this.packetList.size() == 0){
 				try {
-					Thread.sleep(100);
+					Thread.sleep(40);
 					repeatCount +=1;
 					continue;
 				} catch (InterruptedException e) {
@@ -366,7 +364,7 @@ public class RxPSocket {
 			}
 			repeatCount +=1;
 			try {
-				Thread.sleep(100);
+				Thread.sleep(40);
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
