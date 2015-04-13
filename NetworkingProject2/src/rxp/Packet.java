@@ -42,6 +42,8 @@ public class Packet {
 		this.synFlag = synFlag;
 		this.windowSize = windowSize;
 		this.data = data;
+		this.rawBytes = getRawBytes();
+
 	}
 	/**
 	 * This is used to convert a byte array into a readable packet
@@ -172,6 +174,7 @@ public class Packet {
 		for(byte item: raw){
 			ans += String.format("%8s", Integer.toBinaryString(item & 0xFF)).replace(' ', '0') + "|";
 		}
+		ans += "\n" + this.getData().length;
 		return ans;
 	}
 	public void send(){

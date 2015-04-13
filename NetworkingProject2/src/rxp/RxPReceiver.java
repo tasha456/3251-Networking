@@ -21,6 +21,7 @@ public class RxPReceiver {
 	RxPSender sender;
 	int port;
 	int windowSize;
+	int maximumWindowSize;
 	int timeDifference;
 	private final Lock lock = new ReentrantLock();
 	/**
@@ -37,6 +38,7 @@ public class RxPReceiver {
 		this.parent = parent;
 		this.sender = sender;
 		this.data = new Byte[bufferSize + 1];
+		maximumWindowSize = this.data.length;
 		this.address = address;
 		this.port = port;
 		this.timeDifference = 0;
@@ -68,14 +70,12 @@ public class RxPReceiver {
 	public void receivePacket(Packet packet){
 		
 		lock.lock();
-		System.out.println("received " + packet.getSequenceNumber());
 		if(packet.getAckFlag()){
 			sender.acknowledge(packet.getSequenceNumber(),packet.getWindowSize());
 		} else if(indexOffset <= packet.getSequenceNumber() && 
 					indexOffset + data.length > packet.getSequenceNumber()){
 			if(packet.getData() != null){
 				boolean result = copyData(packet.getData(),packet.getSequenceNumber());
-				System.out.println(windowSize);
 				if(result == true){
 					long ackNumber = packet.getSequenceNumber() + packet.getData().length;
 					Packet sendPacket = new Packet(ackNumber, true, false, false, windowSize, 
@@ -99,14 +99,11 @@ public class RxPReceiver {
 		} else if(indexOffset > packet.getSequenceNumber()){
 			if(packet.getData() != null){
 				//we've already received and read the packet, really late duplicate packet
-				System.out.println("Sequence Number: " + packet.getSequenceNumber());
-				System.out.println("range: " + indexOffset + " - " + (indexOffset + data.length));
 				long ackNumber = packet.getSequenceNumber() + packet.getData().length;
 				Packet sendPacket = new Packet(ackNumber, true, false, false, windowSize, 
 						address,port,null);
 				try {
 					parent.sendPacket(sendPacket);
-					System.out.println("SENT ACK");
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
@@ -122,8 +119,6 @@ public class RxPReceiver {
 			}
 		} else{
 			if(packet.getData() != null){
-				System.out.println("Sequence Number: " + packet.getSequenceNumber());
-				System.out.println("range: " + indexOffset + " - " + (indexOffset + data.length));
 			} else if(windowSize > 0){  //control packet, just send an ack with the windowSize
 				long ackNumber = packet.getSequenceNumber();
 				Packet sendPacket = new Packet(ackNumber, true, false, false, windowSize, 
@@ -136,6 +131,23 @@ public class RxPReceiver {
 			}
 		}
 		//System.out.println("window size: " + windowSize);
+		lock.unlock();
+	}
+	public void setMaximumWindowSize(int size){
+		lock.lock();
+		if(size > maximumWindowSize){
+			Byte[] temp = new Byte[size];
+			int i = 0;
+			while(i < data.length){
+				temp[i] = data[i];
+				i++;
+			}
+			this.data = temp;
+		} else if(size < maximumWindowSize){
+			int difference = maximumWindowSize - size;
+			windowSize = windowSize - difference;
+			maximumWindowSize = size;
+		}
 		lock.unlock();
 	}
 	public int readData(byte[] receiver){
@@ -174,7 +186,7 @@ public class RxPReceiver {
 	private boolean copyData(byte[] data,long seqNum){
 		int originalBufferIndex = (int)(seqNum - indexOffset);
 		int bufferIndex = originalBufferIndex;
-		if(originalBufferIndex + data.length > this.data.length){
+		if(originalBufferIndex + data.length > this.maximumWindowSize){
 			return false;
 		}
 		int i = 0;
@@ -187,8 +199,8 @@ public class RxPReceiver {
 		return true;
 	}
 	public int getWindowSize(){
-		if(windowSize < 0)
-			recalculateWindowSize();
+		if(windowSize < 0){}
+		//	recalculateWindowSize();
 		return windowSize;
 	}
 	private void recalculateWindowSize(){
@@ -200,5 +212,8 @@ public class RxPReceiver {
 			}
 		}
 		this.windowSize = winSize;
+	}
+	public void close(){
+		windowSize = -33;
 	}
 }

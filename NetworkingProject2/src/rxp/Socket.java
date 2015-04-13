@@ -11,7 +11,7 @@ public class Socket {
 	public static final int WINDOW_SIZE = 1000;
 	private RxPSocket socket;
 	public Socket(){
-		RxPSocket socket = new RxPSocket();
+		this.socket = new RxPSocket();
 	}
 	public void listen(int portNumber) throws InvalidStateException{
 		listen(portNumber,WINDOW_SIZE);
@@ -44,8 +44,25 @@ public class Socket {
 	public void send(byte[] data){
 		socket.send(data);
 	}
-	public int read(byte[] data){
+	public int read(byte[] data) throws InvalidStateException{
 		return socket.read(data);
 	}
-	
+	public boolean isInUse(){
+		return socket.isInUse();
+	}
+	public boolean isConnected(){
+		return socket.isConnected();
+	}
+	public void close(){
+		socket.close();
+	}
+	public void waitToClose(){
+		socket.waitToClose();
+	}
+	public void readyToClose(){
+		socket.readyToClose();
+	}
+	public void setWindowSize(int size){
+		socket.setWindowSize(size);
+	}
 }

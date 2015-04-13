@@ -17,8 +17,8 @@ public class RxPSender{
 	LinkedList<byte[]> list;
 	LinkedList<Packet> packetList;
 	LinkedList<Integer> timer;
-	int PACKET_LENGTH=300;
-	int TIMEOUT = 10000;
+	int PACKET_LENGTH=9000;
+	int TIMEOUT = 1000;
 	long sequenceNumber;
 	long sentSequenceNumber;
 	RxPParent parent;
@@ -117,7 +117,6 @@ public class RxPSender{
 			packetList.add(packet);
 			timer.add(0);
 			if(windowSize > 0){
-				System.out.println("Sending");
 				try {
 					parent.sendPacket(packet);
 					packet.send();
@@ -132,14 +131,12 @@ public class RxPSender{
 					e.printStackTrace();
 				}
 			} else{
-				System.out.println("Window size too small, packet will be sent later.");
 			}
 			index+=length;
 		}
 		lock.unlock();
 	}
 	public void acknowledge(long synNumber,int packetWindow){
-		System.out.println("ACK " + synNumber);
 		lock.lock();
 		int index = 0;
 		while(index < packetList.size()){
@@ -160,8 +157,24 @@ public class RxPSender{
 			index++;
 		}
 		this.windowSize = packetWindow - (int)(sentSequenceNumber - synNumber);
-		System.out.println("windowSize: " + this.windowSize);
 		lock.unlock();
+	}
+	public void sendClose(){
+		lock.lock();
+		Packet packet = new Packet(sequenceNumber, false, true, false, 0, dest, portNumber, new byte[1]);
+		packetList.add(packet);
+		timer.add(0);
+		try {
+			parent.sendPacket(packet);
+			packet.send();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		lock.unlock();
+	}
+	public void close(){
+		timer = null;
+		packetList = null;
 	}
 //	@Override
 //	public void run(){

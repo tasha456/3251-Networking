@@ -13,20 +13,15 @@ public class TestReceive {
 
 	public static void main(String[] args){
 		System.out.println("RECEIVING STUFF");
-		RxPSocket socket = new RxPSocket();
+		Socket socket = new Socket();
 		try {
-			socket.listen(9993, 20);
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (ConcurrentListenException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			socket.listen(9993, 10000);
+			socket.waitToClose();
 		} catch (InvalidStateException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		while(true){
+		while(socket.isInUse()){
 			Scanner scanner = new Scanner(System.in);
 			String line = scanner.nextLine();
 			if(line.startsWith("send ")){
@@ -34,13 +29,21 @@ public class TestReceive {
 				socket.send(line.getBytes());
 			}
 			else if(line.startsWith("read")){
-				byte[] temp = new byte[200];
-				socket.read(temp);
-				System.out.println(new String(temp));
+				try {
+					byte[] temp = new byte[200];
+					socket.read(temp);
+					System.out.println(new String(temp));
+				} catch (InvalidStateException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
 			}
 			else if(line.startsWith("end")){
-				break;
+				socket.close();
+			} else if(line.startsWith("canClose")){
+				socket.readyToClose();
 			}
 		}
+		System.out.println("Finished");
 	}
 }

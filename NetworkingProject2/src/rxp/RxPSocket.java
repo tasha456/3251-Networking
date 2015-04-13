@@ -14,7 +14,8 @@ import rxpexceptions.*;
 
 public class RxPSocket {
 	
-	public static final int MAXIMUM_PACKET_SIZE = 300;
+	public static int MAXIMUM_PACKET_SIZE = 9000;
+	public static final int TIMED_WAIT_DEFAULT = 10000;
 	private enum State{CLOSED,LISTEN,SYN_RCVD,CHAL_CHCK,SYN_SENT2,ESTABLISHED,
 						CLOSED_WAIT,LAST_ACK,SYN_SENT,CHALLENGE,SYN_WAIT,
 						FIN_WAIT1,FIN_WAIT2,TIMED_WAIT,CLOSING};
@@ -31,24 +32,46 @@ public class RxPSocket {
 	private int startingWindowSize;
 	private int startingConnectionWindowSize;
 	private int portNumber;
+	private int timedWaitTimer;
+	private boolean canClose;
 	
 	
 	public RxPSocket(){
 		this.connectionEstablished = false;
 		this.state = State.CLOSED;
 		this.packetList = new LinkedList<Packet>();
+		this.canClose = true;
+		timedWaitTimer = 0;
 	}
 	public void update(int deltaT){
 		if(sender != null)
 			sender.update(deltaT);
 		if(receiver != null)
 			receiver.update(deltaT);
+		if(this.state == State.TIMED_WAIT){
+			timedWaitTimer -=deltaT;
+			if(timedWaitTimer <=0){
+				parent.closeSocket(this);
+				state = State.CLOSED;
+				sender.close();
+				receiver.close();
+				sender = null;
+				receiver = null;
+				connectionPort = 0;
+				connectionAddress = null;
+				connectionEstablished = false;
+			}
+		}
 	}
 	public void send(byte[] data){
 		sender.send(data);
 	}
-	public int read(byte[] data){
-		return receiver.readData(data);
+	public int read(byte[] data) throws InvalidStateException{
+		try{
+			return receiver.readData(data);
+		} catch(Exception e){
+			throw new InvalidStateException();
+		}
 	}
 	public void receivePacket(Packet packet){
 		if(packet.getIsCorrupted()){
@@ -72,11 +95,62 @@ public class RxPSocket {
 
 			break;
 		case ESTABLISHED:
-			this.receiver.receivePacket(packet);
+			if(packet.getFinFlag()){
+				state = State.CLOSED_WAIT;
+				Packet sendPacket = new Packet(packet.getSequenceNumber()+1, true, false, false, 
+						connectionPort, connectionAddress, connectionPort, null);
+				try {
+					parent.sendPacket(sendPacket);
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+				if(canClose){
+					sender.sendClose();
+					state = State.LAST_ACK;
+				}
+			}
+			else{
+				this.receiver.receivePacket(packet);
+			}
 			break;
 		case CLOSED_WAIT:
+			if(packet.getFinFlag()){ //repeat from established
+				Packet sendPacket = new Packet(packet.getSequenceNumber()+1, true, false, false, 
+						connectionPort, connectionAddress, connectionPort, null);
+				try {
+					parent.sendPacket(sendPacket);
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+			//this section is handled by the ready to close methods.
 			break;
 		case LAST_ACK:
+			if(packet.getFinFlag()){
+				Packet sendPacket = new Packet(packet.getSequenceNumber()+1, true, false, false, 
+						connectionPort, connectionAddress, connectionPort, null);
+				try {
+					parent.sendPacket(sendPacket);
+					sender.sendClose();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+				if(canClose){
+					sender.sendClose();
+				}
+			}
+			
+			if(packet.getAckFlag()){
+				parent.closeSocket(this);
+				state = State.CLOSED;
+				sender.close();
+				receiver.close();
+				sender = null;
+				receiver = null;
+				connectionEstablished = false;
+				connectionPort = 0;
+				connectionAddress = null;
+			}
 			break;
 		case SYN_SENT:
 			packetList.add(packet);
@@ -88,16 +162,51 @@ public class RxPSocket {
 			packetList.add(packet);
 			break;
 		case FIN_WAIT1:
+			if(packet.getAckFlag()){
+				state = State.FIN_WAIT2;
+				receiver.receivePacket(packet);
+			}
 			break;
 		case FIN_WAIT2:
+			if(packet.getFinFlag()){
+				ackNumber = packet.getSequenceNumber();
+				Packet sendPacket = new Packet(ackNumber, true, false, false, 0, connectionAddress, connectionPort, null);
+				try {
+					parent.sendPacket(sendPacket);
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+				timedWaitTimer = TIMED_WAIT_DEFAULT;
+				state = State.TIMED_WAIT;
+			} else if(packet.getAckFlag()){
+				receiver.receivePacket(packet);
+			}
 			break;
-		case TIMED_WAIT:
+		case TIMED_WAIT: // timer stuff is done in update
+			if(packet.getFinFlag()){
+				Packet sendPacket = new Packet(ackNumber, true, false, false, 0, connectionAddress, connectionPort, null);
+				try {
+					parent.sendPacket(sendPacket);
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
 			break;
 		case CLOSING:
 			break;
 		default:
 			System.out.println("Unknown State: " + state);
 			break;
+		}
+	}
+	public void waitToClose(){
+		canClose = false;
+	}
+	public void readyToClose(){
+		canClose = true;
+		if(state == State.CLOSED_WAIT){
+			sender.sendClose();
+			state = State.LAST_ACK;
 		}
 	}
 	public InetAddress getDestinationAddress(){
@@ -135,7 +244,8 @@ public class RxPSocket {
 			}
 		}
 		while(this.state != State.ESTABLISHED){
-			if(repeatCount %40 == 0){
+			if(repeatCount - 40 <= 0){
+				repeatCount = 0;
 				switch(this.state){
 					case SYN_SENT:
 						try {
@@ -154,7 +264,7 @@ public class RxPSocket {
 			}
 			if(this.packetList.size() == 0){
 				try {
-					Thread.sleep(100);
+					Thread.sleep(40);
 					repeatCount +=1;
 					continue;
 				} catch (InterruptedException e) {
@@ -194,11 +304,12 @@ public class RxPSocket {
 				break;
 			case SYN_WAIT:
 				try{
-					if(repeatCount %40 == 0){
+					if(repeatCount -40 <= 0){
 						Packet sendPacket = new Packet(this.sequenceNumber, 
 								false, false, false, 0, connectionAddress,
 								connectionPort, challengeAnswer);
 						parent.sendPacket(sendPacket);
+						repeatCount = 0;
 					}
 					if(packet.getAddress().equals(this.connectionAddress)){
 						if(packet.getSynFlag()){
@@ -366,12 +477,28 @@ public class RxPSocket {
 			}
 			repeatCount +=1;
 			try {
-				Thread.sleep(100);
+				Thread.sleep(40);
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
 		}
 			
+	}
+	public void close(){
+		sender.sendClose();
+		state = State.FIN_WAIT1;
+	}
+	public boolean isInUse(){
+		return state != State.CLOSED;
+	}
+	public boolean isConnected(){
+		return state == State.ESTABLISHED;
+	}
+	public void setWindowSize(int size){
+		startingWindowSize = size*MAXIMUM_PACKET_SIZE;
+		if(receiver != null){
+			receiver.setMaximumWindowSize(startingWindowSize);
+		}
 	}
 	
 	

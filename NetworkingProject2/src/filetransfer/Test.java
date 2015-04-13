@@ -15,16 +15,10 @@ public class Test {
 
 	public static void main(String args[]){
 		System.out.println("SENDING STUFF");
-		RxPSocket socket = new RxPSocket();
+		Socket socket = new Socket();
 		try {
 			InetAddress address = InetAddress.getByName("localhost");
 			socket.connect(9994,address,9993, 10000);
-		} catch (ValidationException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (ConcurrentListenException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
 		} catch (InvalidStateException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -39,7 +33,7 @@ public class Test {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		while(true){
+		while(socket.isInUse()){
 			Scanner scanner = new Scanner(System.in);
 			String line = scanner.nextLine();
 			if(line.startsWith("send ")){
@@ -48,11 +42,15 @@ public class Test {
 			}
 			else if(line.startsWith("read")){
 				byte[] temp = new byte[200];
-				socket.read(temp);
-				System.out.println(new String(temp));
+				try {
+					socket.read(temp);
+					System.out.println(new String(temp));
+				} catch (InvalidStateException e) {
+					
+				}
 			}
 			else if(line.startsWith("end")){
-				System.exit(0);
+				socket.close();
 			}
 		}
 	}

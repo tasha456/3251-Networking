@@ -18,6 +18,7 @@ public class RxPParent implements Runnable{
 	private static HashMap<Integer,RxPParent> parentSocket;
 	private RxPSocket listeningSocket = null;
 	private int portNumber;
+	private int counter;
 	private boolean active;
 	private DatagramSocket socket;
 	private LinkedList<Packet>packetList;
@@ -25,6 +26,7 @@ public class RxPParent implements Runnable{
 		this.portNumber = portNumber;
 		this.socket = new DatagramSocket(portNumber);
 		this.socket.setSoTimeout(200);
+		this.counter = 0;
 		rxpSocket = new HashMap<String,RxPSocket>();
 		packetList = new LinkedList<Packet>();
 	}
@@ -32,10 +34,9 @@ public class RxPParent implements Runnable{
 		active = true;
 		while(active){
 			try {
-				byte[] data = new byte[RxPSocket.MAXIMUM_PACKET_SIZE];
-				DatagramPacket rawPacket = new DatagramPacket(data,RxPSocket.MAXIMUM_PACKET_SIZE);
+				byte[] data = new byte[RxPSocket.MAXIMUM_PACKET_SIZE + 100];
+				DatagramPacket rawPacket = new DatagramPacket(data,RxPSocket.MAXIMUM_PACKET_SIZE + 100);
 				socket.receive(rawPacket);
-				
 				int len = rawPacket.getLength();
 				byte[] actualPacket = new byte[len];
 				System.arraycopy(rawPacket.getData(),0, actualPacket, 0, len);
@@ -45,7 +46,8 @@ public class RxPParent implements Runnable{
 				if(packet.getIsCorrupted() == false){
 					receivePacket(packet);
 				} else{
-					System.out.println("Corrupted packet ");
+					//System.out.println("Corrupted packet ");
+					//System.out.println(packet.toString());
 				}
 				sendQueuedPackets();
 			}   
@@ -111,6 +113,14 @@ public class RxPParent implements Runnable{
 				listeningSocket.receivePacket(packet);
 			} else{
 				System.out.println("received packet for unknown socket");
+			}
+		}
+	}
+	public void closeSocket(RxPSocket socket){
+		if(rxpSocket.containsKey(createKey(socket))){
+			rxpSocket.remove(createKey(socket));
+			if(rxpSocket.isEmpty()){
+				active = false;
 			}
 		}
 	}
